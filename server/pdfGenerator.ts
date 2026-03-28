@@ -3,8 +3,28 @@ import { PassThrough } from "stream";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import https from "https";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Logo URLs
+const LOGO_URLS = {
+  quraish: "https://d2xsxph8kpxj0f.cloudfront.net/310519663346868864/TJtk4unPLR36oJYebaM6yg/quraish-logo_1ecf0210.png",
+  azan: "https://d2xsxph8kpxj0f.cloudfront.net/310519663346868864/TJtk4unPLR36oJYebaM6yg/azan-logo_ef925323.png",
+  combined: "https://d2xsxph8kpxj0f.cloudfront.net/310519663346868864/TJtk4unPLR36oJYebaM6yg/combined-logo_017b3a89.png",
+};
+
+// Helper to download image from URL
+async function downloadImage(url: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    https.get(url, (response) => {
+      const chunks: Buffer[] = [];
+      response.on("data", (chunk: Buffer) => chunks.push(chunk));
+      response.on("end", () => resolve(Buffer.concat(chunks)));
+      response.on("error", reject);
+    }).on("error", reject);
+  });
+}
 
 // Helper to reverse Arabic text for PDFKit (basic RTL support)
 function reverseArabic(text: string): string {
@@ -51,35 +71,45 @@ interface EvaluationPDFData {
   status: string;
 }
 
-function drawHeader(doc: InstanceType<typeof PDFDocument>, company: string, title: string) {
-  const companyName = company === "quraish" ? "شركة قريش" : "شركة أذان";
+async function drawHeader(doc: InstanceType<typeof PDFDocument>, company: string, title: string) {
   const fontPath = getFontPath();
   
   // Header background
-  doc.rect(0, 0, doc.page.width, 100).fill("#1a365d");
+  doc.rect(0, 0, doc.page.width, 120).fill("#f8f8f8");
+  
+  // Get logo URL
+  const logoUrl = company === "quraish" ? LOGO_URLS.quraish : LOGO_URLS.azan;
+  
+  try {
+    const logoBuffer = await downloadImage(logoUrl);
+    doc.image(logoBuffer, 50, 10, { width: 60, height: 60 });
+  } catch (err) {
+    console.warn("Failed to load logo:", err);
+  }
   
   // Company name
+  const companyName = company === "quraish" ? "شركة قريش المحدودة" : "شركة أذان المحدودة";
   if (fontPath !== "Helvetica") {
     doc.font(fontPath);
   }
-  doc.fontSize(22).fillColor("#ffffff");
-  doc.text(reverseArabic(companyName), 50, 25, { 
-    width: doc.page.width - 100, 
-    align: "center" 
+  doc.fontSize(18).fillColor("#1a365d");
+  doc.text(reverseArabic(companyName), 120, 20, { 
+    width: doc.page.width - 180, 
+    align: "right" 
   });
   
   // Document title
-  doc.fontSize(14).fillColor("#d4af37");
-  doc.text(reverseArabic(title), 50, 60, { 
-    width: doc.page.width - 100, 
-    align: "center" 
+  doc.fontSize(12).fillColor("#666666");
+  doc.text(reverseArabic(title), 120, 50, { 
+    width: doc.page.width - 180, 
+    align: "right" 
   });
   
-  // Gold line
-  doc.moveTo(50, 100).lineTo(doc.page.width - 50, 100).strokeColor("#d4af37").lineWidth(2).stroke();
+  // Divider line
+  doc.moveTo(50, 120).lineTo(doc.page.width - 50, 120).strokeColor("#d4af37").lineWidth(1.5).stroke();
   
   doc.fillColor("#333333");
-  return 120;
+  return 135;
 }
 
 function drawField(doc: InstanceType<typeof PDFDocument>, label: string, value: string, y: number, options?: { width?: number; x?: number }) {
@@ -143,8 +173,8 @@ function drawFooter(doc: InstanceType<typeof PDFDocument>) {
   });
 }
 
-export function generateMeetingPDF(data: MeetingPDFData): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
+export async function generateMeetingPDF(data: MeetingPDFData): Promise<Buffer> {
+  return new Promise(async (resolve, reject) => {
     try {
       const doc = new PDFDocument({ 
         size: "A4", 
@@ -164,7 +194,7 @@ export function generateMeetingPDF(data: MeetingPDFData): Promise<Buffer> {
       stream.on("error", reject);
       
       // Header
-      let y = drawHeader(doc, data.company, "محضر اجتماع");
+      let y = await drawHeader(doc, data.company, "محضر اجتماع");
       
       // Date and Day
       const halfWidth = (doc.page.width - 120) / 2;
@@ -232,8 +262,8 @@ export function generateMeetingPDF(data: MeetingPDFData): Promise<Buffer> {
   });
 }
 
-export function generateEvaluationPDF(data: EvaluationPDFData): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
+export async function generateEvaluationPDF(data: EvaluationPDFData): Promise<Buffer> {
+  return new Promise(async (resolve, reject) => {
     try {
       const doc = new PDFDocument({ 
         size: "A4", 
@@ -253,7 +283,7 @@ export function generateEvaluationPDF(data: EvaluationPDFData): Promise<Buffer> 
       stream.on("error", reject);
       
       // Header
-      let y = drawHeader(doc, data.company, "تقرير تقييم");
+      let y = await drawHeader(doc, data.company, "تقرير تقييم");
       
       // Report number
       y = drawField(doc, "رقم التقرير", data.reportNumber, y);
