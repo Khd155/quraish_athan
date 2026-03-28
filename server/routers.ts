@@ -1,28 +1,274 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { z } from "zod";
+import * as db from "./db";
+import { sdk } from "./_core/sdk";
+import { ONE_YEAR_MS } from "@shared/const";
+import { storagePut } from "./storage";
+import { nanoid } from "nanoid";
+import { TRPCError } from "@trpc/server";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      return { success: true } as const;
     }),
+    // تسجيل دخول محلي
+    localLogin: publicProcedure
+      .input(z.object({
+        username: z.string().min(1),
+        password: z.string().min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await db.verifyLocalUser(input.username, input.password);
+        if (!user) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "اسم المستخدم أو كلمة المرور غير صحيحة" });
+        }
+        const sessionToken = await sdk.createSessionToken(user.openId, {
+          name: user.name || "",
+          expiresInMs: ONE_YEAR_MS,
+        });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        return { success: true, user: { id: user.id, name: user.name, role: user.role, username: user.username } };
+      }),
   }),
 
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+  // ============ إدارة المستخدمين (Admin فقط) ============
+  users: router({
+    list: adminProcedure.query(async () => {
+      return db.getAllUsers();
+    }),
+    create: adminProcedure
+      .input(z.object({
+        username: z.string().min(3),
+        password: z.string().min(6),
+        name: z.string().min(1),
+        role: z.enum(["admin", "user"]),
+      }))
+      .mutation(async ({ input }) => {
+        const existing = await db.getUserByUsername(input.username);
+        if (existing) {
+          throw new TRPCError({ code: "CONFLICT", message: "اسم المستخدم موجود مسبقاً" });
+        }
+        return db.createLocalUser(input);
+      }),
+    delete: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteUser(input.userId);
+        return { success: true };
+      }),
+    resetPassword: adminProcedure
+      .input(z.object({ userId: z.number(), newPassword: z.string().min(6) }))
+      .mutation(async ({ input }) => {
+        await db.updateUserPassword(input.userId, input.newPassword);
+        return { success: true };
+      }),
+  }),
+
+  // ============ محاضر الاجتماعات ============
+  meetings: router({
+    create: protectedProcedure
+      .input(z.object({
+        company: z.enum(["quraish", "azan"]),
+        hijriDate: z.string(),
+        dayOfWeek: z.string(),
+        title: z.string().min(1),
+        objectives: z.string().optional(),
+        recommendations: z.string().optional(),
+        department: z.string().optional(),
+        attendees: z.array(z.string()).optional(),
+        status: z.enum(["draft", "final"]).default("draft"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const id = await db.createMeeting({
+          ...input,
+          attendees: input.attendees ?? [],
+          createdById: ctx.user.id,
+          createdByName: ctx.user.name ?? "",
+        });
+        return { id };
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        company: z.enum(["quraish", "azan"]).optional(),
+        hijriDate: z.string().optional(),
+        dayOfWeek: z.string().optional(),
+        title: z.string().optional(),
+        objectives: z.string().optional(),
+        recommendations: z.string().optional(),
+        department: z.string().optional(),
+        attendees: z.array(z.string()).optional(),
+        status: z.enum(["draft", "final"]).optional(),
+        pdfUrl: z.string().optional(),
+        pdfKey: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await db.updateMeeting(id, data);
+        return { success: true };
+      }),
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return db.getMeetingById(input.id);
+      }),
+    myMeetings: protectedProcedure.query(async ({ ctx }) => {
+      return db.getMeetingsByUser(ctx.user.id);
+    }),
+    all: adminProcedure
+      .input(z.object({
+        company: z.string().optional(),
+        search: z.string().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        return db.getAllMeetings(input);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const meeting = await db.getMeetingById(input.id);
+        if (!meeting) throw new TRPCError({ code: "NOT_FOUND" });
+        if (meeting.createdById !== ctx.user.id && ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        await db.deleteMeeting(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // ============ تقارير التقييم ============
+  evaluations: router({
+    create: protectedProcedure
+      .input(z.object({
+        company: z.enum(["quraish", "azan"]),
+        hijriDate: z.string(),
+        dayOfWeek: z.string(),
+        axis: z.string(),
+        track: z.string(),
+        criterion: z.string(),
+        score: z.number().min(0).max(100).optional(),
+        notes: z.string().optional(),
+        status: z.enum(["draft", "final"]).default("draft"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const hijriYear = input.hijriDate.split("/")[0] || "1447";
+        const reportNumber = await db.getNextReportNumber(hijriYear);
+        const id = await db.createEvaluationReport({
+          ...input,
+          reportNumber,
+          createdById: ctx.user.id,
+          createdByName: ctx.user.name ?? "",
+        });
+        return { id, reportNumber };
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        company: z.enum(["quraish", "azan"]).optional(),
+        hijriDate: z.string().optional(),
+        dayOfWeek: z.string().optional(),
+        axis: z.string().optional(),
+        track: z.string().optional(),
+        criterion: z.string().optional(),
+        score: z.number().min(0).max(100).optional(),
+        notes: z.string().optional(),
+        status: z.enum(["draft", "final"]).optional(),
+        pdfUrl: z.string().optional(),
+        pdfKey: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await db.updateEvaluationReport(id, data);
+        return { success: true };
+      }),
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return db.getEvaluationReportById(input.id);
+      }),
+    myReports: protectedProcedure.query(async ({ ctx }) => {
+      return db.getEvaluationReportsByUser(ctx.user.id);
+    }),
+    all: adminProcedure
+      .input(z.object({
+        company: z.string().optional(),
+        search: z.string().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        return db.getAllEvaluationReports(input);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const report = await db.getEvaluationReportById(input.id);
+        if (!report) throw new TRPCError({ code: "NOT_FOUND" });
+        if (report.createdById !== ctx.user.id && ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+        await db.deleteEvaluationReport(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // ============ المرفقات ============
+  attachments: router({
+    upload: protectedProcedure
+      .input(z.object({
+        entityType: z.enum(["meeting", "evaluation"]),
+        entityId: z.number(),
+        fileName: z.string(),
+        fileData: z.string(), // base64
+        mimeType: z.string(),
+        fileSize: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const buffer = Buffer.from(input.fileData, "base64");
+        const fileKey = `attachments/${input.entityType}/${input.entityId}/${nanoid()}-${input.fileName}`;
+        const { url } = await storagePut(fileKey, buffer, input.mimeType);
+        const id = await db.createAttachment({
+          entityType: input.entityType,
+          entityId: input.entityId,
+          fileName: input.fileName,
+          fileUrl: url,
+          fileKey: fileKey,
+          mimeType: input.mimeType,
+          fileSize: input.fileSize,
+          uploadedById: ctx.user.id,
+        });
+        return { id, url, fileKey };
+      }),
+    getByEntity: protectedProcedure
+      .input(z.object({
+        entityType: z.enum(["meeting", "evaluation"]),
+        entityId: z.number(),
+      }))
+      .query(async ({ input }) => {
+        return db.getAttachmentsByEntity(input.entityType, input.entityId);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteAttachment(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // ============ الإحصائيات ============
+  stats: router({
+    overview: adminProcedure.query(async () => {
+      return db.getStats();
+    }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
