@@ -7,7 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { generateMeetingPDF, generateEvaluationPDF } from "../pdfGenerator";
+import { generateMeetingPDFV2, generateEvaluationPDFV2, closeBrowser } from "../pdfGeneratorV2";
 import * as db from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -37,7 +37,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
-  // PDF Generation Routes
+  // PDF Generation Routes (using Puppeteer for proper Arabic support)
   app.get("/api/pdf/meeting/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -46,7 +46,7 @@ async function startServer() {
         res.status(404).json({ error: "Meeting not found" });
         return;
       }
-      const pdfBuffer = await generateMeetingPDF({
+      const pdfBuffer = await generateMeetingPDFV2({
         company: meeting.company,
         hijriDate: meeting.hijriDate,
         dayOfWeek: meeting.dayOfWeek,
@@ -57,9 +57,10 @@ async function startServer() {
         attendees: meeting.attendees as string[],
         createdByName: meeting.createdByName,
         status: meeting.status,
+        reportNumber: "",
       });
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=meeting_${id}.pdf`);
+      res.setHeader("Content-Disposition", `attachment; filename="محضر_اجتماع_${id}.pdf"`);
       res.send(pdfBuffer);
     } catch (err: any) {
       console.error("PDF generation error:", err);
@@ -75,7 +76,7 @@ async function startServer() {
         res.status(404).json({ error: "Report not found" });
         return;
       }
-      const pdfBuffer = await generateEvaluationPDF({
+      const pdfBuffer = await generateEvaluationPDFV2({
         company: report.company,
         hijriDate: report.hijriDate,
         dayOfWeek: report.dayOfWeek,
@@ -89,7 +90,7 @@ async function startServer() {
         status: report.status,
       });
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=evaluation_${id}.pdf`);
+      res.setHeader("Content-Disposition", `attachment; filename="تقرير_تقييم_${report.reportNumber}.pdf"`);
       res.send(pdfBuffer);
     } catch (err: any) {
       console.error("PDF generation error:", err);
