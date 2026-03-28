@@ -132,9 +132,10 @@ async function startServer() {
       const pdfBuffer = await callPdfService("/pdf/meeting", {
         company: meeting.company,
         hijriDate: meeting.hijriDate,
+        gregorianDate: meeting.gregorianDate,
         dayOfWeek: meeting.dayOfWeek,
         title: meeting.title,
-        objectives: meeting.objectives,
+        elements: meeting.elements,
         recommendations: meeting.recommendations,
         department: meeting.department,
         attendees: meeting.attendees as string[],

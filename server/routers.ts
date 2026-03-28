@@ -80,13 +80,14 @@ export const appRouter = router({
       .input(z.object({
         company: z.enum(["quraish", "azan"]),
         hijriDate: z.string(),
+        gregorianDate: z.string().optional(),
         dayOfWeek: z.string(),
-        title: z.string().min(1),
-        objectives: z.string().optional(),
+        title: z.string(),
+        elements: z.string().optional(),
         recommendations: z.string().optional(),
-        department: z.string().optional(),
+        department: z.enum(["technology", "catering", "transport", "cultural", "media", "supervisors"]).optional(),
         attendees: z.array(z.string()).optional(),
-        status: z.enum(["draft", "final"]).default("draft"),
+        status: z.enum(["draft", "final"]),
       }))
       .mutation(async ({ input, ctx }) => {
         const id = await db.createMeeting({
@@ -102,11 +103,12 @@ export const appRouter = router({
         id: z.number(),
         company: z.enum(["quraish", "azan"]).optional(),
         hijriDate: z.string().optional(),
+        gregorianDate: z.string().optional(),
         dayOfWeek: z.string().optional(),
         title: z.string().optional(),
-        objectives: z.string().optional(),
+        elements: z.string().optional(),
         recommendations: z.string().optional(),
-        department: z.string().optional(),
+        department: z.enum(["technology", "catering", "transport", "cultural", "media", "supervisors"]).optional(),
         attendees: z.array(z.string()).optional(),
         status: z.enum(["draft", "final"]).optional(),
         pdfUrl: z.string().optional(),
