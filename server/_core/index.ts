@@ -82,17 +82,26 @@ function startPdfService(): Promise<void> {
 }
 
 async function callPdfService(endpoint: string, data: object): Promise<Buffer> {
-  const response = await fetch(`http://127.0.0.1:${PDF_SERVICE_PORT}${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`PDF service error: ${errText}`);
+  try {
+    const response = await fetch(`http://127.0.0.1:${PDF_SERVICE_PORT}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[PDF Service] Error response (${response.status}):`, errText.substring(0, 200));
+      throw new Error(`PDF service error (${response.status}): ${errText.substring(0, 100)}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength === 0) {
+      throw new Error("PDF service returned empty response");
+    }
+    return Buffer.from(arrayBuffer);
+  } catch (err: any) {
+    console.error(`[PDF Service] Call failed for ${endpoint}:`, err.message);
+    throw err;
   }
-  const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
 }
 
 async function startServer() {

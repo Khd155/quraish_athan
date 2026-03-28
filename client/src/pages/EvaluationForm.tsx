@@ -97,8 +97,16 @@ export default function EvaluationForm() {
   });
 
   const handleSave = (status: "draft" | "final") => {
-    if (!selectedAxis || !selectedTrack || !selectedCriterion) {
-      toast.error("يرجى اختيار المحور والمسار والمعيار");
+    if (!selectedAxis) {
+      toast.error("يرجى اختيار المحور");
+      return;
+    }
+    if (!selectedTrack) {
+      toast.error("يرجى اختيار المسار");
+      return;
+    }
+    if (!selectedCriterion) {
+      toast.error("يرجى اختيار المعيار");
       return;
     }
     const axisObj = evaluationAxes.find(a => a.id === selectedAxis);

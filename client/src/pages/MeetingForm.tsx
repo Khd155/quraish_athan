@@ -23,8 +23,8 @@ export default function MeetingForm() {
   const [hijriDate, setHijriDate] = useState("");
   const [dayOfWeek, setDayOfWeek] = useState("");
   const [title, setTitle] = useState("");
-  const [objectives, setObjectives] = useState("");
-  const [recommendations, setRecommendations] = useState("");
+  const [objectives, setObjectives] = useState<string[]>([""]);
+  const [recommendations, setRecommendations] = useState<string[]>([""]);
   const [department, setDepartment] = useState("");
   const [attendees, setAttendees] = useState<string[]>([""]);
   const [entityId, setEntityId] = useState<number | null>(null);
@@ -60,8 +60,11 @@ export default function MeetingForm() {
       setHijriDate(existingMeeting.hijriDate);
       setDayOfWeek(existingMeeting.dayOfWeek);
       setTitle(existingMeeting.title as string);
-      setObjectives((existingMeeting.objectives as string) || "");
-      setRecommendations((existingMeeting.recommendations as string) || "");
+      // Parse objectives and recommendations as arrays
+      const objStr = (existingMeeting.objectives as string) || "";
+      setObjectives(objStr ? objStr.split("\n").filter(o => o.trim()) : [""]);
+      const recStr = (existingMeeting.recommendations as string) || "";
+      setRecommendations(recStr ? recStr.split("\n").filter(r => r.trim()) : [""]);
       setDepartment(existingMeeting.department || "");
       setAttendees((existingMeeting.attendees as string[]) || [""]);
       setEntityId(existingMeeting.id);
@@ -91,8 +94,8 @@ export default function MeetingForm() {
       hijriDate,
       dayOfWeek,
       title: title.trim(),
-      objectives: objectives.trim(),
-      recommendations: recommendations.trim(),
+      objectives: objectives.filter(o => o.trim()).join("\n"),
+      recommendations: recommendations.filter(r => r.trim()).join("\n"),
       department: department.trim(),
       attendees: attendees.filter(a => a.trim()),
       status,
@@ -132,6 +135,31 @@ export default function MeetingForm() {
     }
   };
 
+  // Objectives handlers
+  const addObjective = () => setObjectives([...objectives, ""]);
+  const removeObjective = (index: number) => {
+    if (objectives.length <= 1) return;
+    setObjectives(objectives.filter((_, i) => i !== index));
+  };
+  const updateObjective = (index: number, value: string) => {
+    const updated = [...objectives];
+    updated[index] = value;
+    setObjectives(updated);
+  };
+
+  // Recommendations handlers
+  const addRecommendation = () => setRecommendations([...recommendations, ""]);
+  const removeRecommendation = (index: number) => {
+    if (recommendations.length <= 1) return;
+    setRecommendations(recommendations.filter((_, i) => i !== index));
+  };
+  const updateRecommendation = (index: number, value: string) => {
+    const updated = [...recommendations];
+    updated[index] = value;
+    setRecommendations(updated);
+  };
+
+  // Attendees handlers
   const addAttendee = () => setAttendees([...attendees, ""]);
   const removeAttendee = (index: number) => {
     if (attendees.length <= 1) return;
@@ -222,25 +250,57 @@ export default function MeetingForm() {
           </div>
 
           {/* Objectives */}
-          <div className="space-y-2">
-            <Label>الأهداف</Label>
-            <Textarea
-              value={objectives}
-              onChange={(e) => setObjectives(e.target.value)}
-              placeholder="أهداف الاجتماع..."
-              rows={4}
-            />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>الأهداف</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addObjective}>
+                <Plus className="w-4 h-4 ml-1" />
+                إضافة هدف
+              </Button>
+            </div>
+            {objectives.map((objective, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Textarea
+                  value={objective}
+                  onChange={(e) => updateObjective(index, e.target.value)}
+                  placeholder={`الهدف ${index + 1}`}
+                  rows={2}
+                  className="flex-1"
+                />
+                {objectives.length > 1 && (
+                  <Button type="button" variant="ghost" size="icon" onClick={() => removeObjective(index)}>
+                    <X className="w-4 h-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
 
           {/* Recommendations */}
-          <div className="space-y-2">
-            <Label>التوصيات</Label>
-            <Textarea
-              value={recommendations}
-              onChange={(e) => setRecommendations(e.target.value)}
-              placeholder="توصيات الاجتماع..."
-              rows={4}
-            />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>التوصيات</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addRecommendation}>
+                <Plus className="w-4 h-4 ml-1" />
+                إضافة توصية
+              </Button>
+            </div>
+            {recommendations.map((recommendation, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Textarea
+                  value={recommendation}
+                  onChange={(e) => updateRecommendation(index, e.target.value)}
+                  placeholder={`التوصية ${index + 1}`}
+                  rows={2}
+                  className="flex-1"
+                />
+                {recommendations.length > 1 && (
+                  <Button type="button" variant="ghost" size="icon" onClick={() => removeRecommendation(index)}>
+                    <X className="w-4 h-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
 
           {/* Attendees */}
