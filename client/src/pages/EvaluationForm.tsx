@@ -9,11 +9,48 @@ import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { evaluationAxes, getTracksByAxis, getCriteriaByTrack } from "@shared/evaluationData";
 import { DAYS_OF_WEEK, gregorianToHijri, formatHijriDate, getDayOfWeek, getDayFromHijriDate } from "@shared/hijriUtils";
-import { ArrowRight, Loader2, Save, FileDown } from "lucide-react";
+import { ArrowRight, Loader2, Save, FileDown, Eye } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import FileUploadZone from "@/components/FileUploadZone";
+import PdfPreviewModal from "@/components/PdfPreviewModal";
+
+/**
+ * يحوّل نص محفوظ (اسم كامل) إلى ID المقابل في قائمة البيانات
+ * يدعم كلا الحالتين: ID مباشر أو نص كامل (للبيانات القديمة)
+ */
+function resolveAxisId(stored: string): string {
+  // إذا كان ID مباشر موجود
+  const byId = evaluationAxes.find(a => a.id === stored);
+  if (byId) return byId.id;
+  // إذا كان نص كامل (بيانات قديمة)
+  const byName = evaluationAxes.find(a => a.name === stored);
+  if (byName) return byName.id;
+  return stored;
+}
+
+function resolveTrackId(axisId: string, stored: string): string {
+  const axis = evaluationAxes.find(a => a.id === axisId);
+  if (!axis) return stored;
+  const byId = axis.tracks.find(t => t.id === stored);
+  if (byId) return byId.id;
+  const byName = axis.tracks.find(t => t.name === stored);
+  if (byName) return byName.id;
+  return stored;
+}
+
+function resolveCriterionId(axisId: string, trackId: string, stored: string): string {
+  const axis = evaluationAxes.find(a => a.id === axisId);
+  if (!axis) return stored;
+  const track = axis.tracks.find(t => t.id === trackId);
+  if (!track) return stored;
+  const byId = track.criteria.find(c => c.id === stored);
+  if (byId) return byId.id;
+  const byName = track.criteria.find(c => c.name === stored);
+  if (byName) return byName.id;
+  return stored;
+}
 
 export default function EvaluationForm() {
   const { user } = useAuth();
@@ -31,6 +68,9 @@ export default function EvaluationForm() {
   const [notes, setNotes] = useState("");
   const [entityId, setEntityId] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  // منع reset عند تحميل البيانات القديمة
+  const [isLoadingExisting, setIsLoadingExisting] = useState(false);
 
   // Auto-detect today
   useEffect(() => {
@@ -56,9 +96,19 @@ export default function EvaluationForm() {
   // Dynamic criteria based on track
   const criteria = useMemo(() => getCriteriaByTrack(selectedAxis, selectedTrack), [selectedAxis, selectedTrack]);
 
-  // Reset dependent fields
-  useEffect(() => { setSelectedTrack(""); setSelectedCriterion(""); }, [selectedAxis]);
-  useEffect(() => { setSelectedCriterion(""); }, [selectedTrack]);
+  // Reset dependent fields - فقط عند تغيير المستخدم (ليس عند التحميل)
+  useEffect(() => {
+    if (!isLoadingExisting) {
+      setSelectedTrack("");
+      setSelectedCriterion("");
+    }
+  }, [selectedAxis]);
+
+  useEffect(() => {
+    if (!isLoadingExisting) {
+      setSelectedCriterion("");
+    }
+  }, [selectedTrack]);
 
   // Load existing report
   const { data: existingReport } = trpc.evaluations.getById.useQuery(
@@ -68,18 +118,28 @@ export default function EvaluationForm() {
 
   useEffect(() => {
     if (existingReport) {
+      setIsLoadingExisting(true);
       setHijriDate(existingReport.hijriDate);
       setDayOfWeek(existingReport.dayOfWeek);
-      setSelectedAxis(existingReport.axis);
       setScore(existingReport.score ?? 0);
       setNotes(existingReport.notes ?? "");
       setEntityId(existingReport.id);
+
+      // حل مشكلة البيانات القديمة: تحويل النص الكامل إلى ID
+      const resolvedAxisId = resolveAxisId(existingReport.axis);
+      setSelectedAxis(resolvedAxisId);
+
+      // نستخدم setTimeout لإتاحة وقت لتحديث tracks
       setTimeout(() => {
-        setSelectedTrack(existingReport.track);
+        const resolvedTrackId = resolveTrackId(resolvedAxisId, existingReport.track);
+        setSelectedTrack(resolvedTrackId);
+
         setTimeout(() => {
-          setSelectedCriterion(existingReport.criterion);
-        }, 50);
-      }, 50);
+          const resolvedCriterionId = resolveCriterionId(resolvedAxisId, resolvedTrackId, existingReport.criterion);
+          setSelectedCriterion(resolvedCriterionId);
+          setIsLoadingExisting(false);
+        }, 100);
+      }, 100);
     }
   }, [existingReport]);
 
@@ -134,7 +194,7 @@ export default function EvaluationForm() {
     }
   };
 
-  // PDF Export
+  // PDF Export (direct download)
   const handleExportPDF = async () => {
     if (!entityId) {
       toast.error("يرجى حفظ التقرير أولاً");
@@ -143,7 +203,10 @@ export default function EvaluationForm() {
     setGenerating(true);
     try {
       const res = await fetch(`/api/pdf/evaluation/${entityId}`);
-      if (!res.ok) throw new Error("فشل في إنشاء PDF");
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "فشل في إنشاء PDF");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -161,26 +224,36 @@ export default function EvaluationForm() {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  // عرض اسم المحور/المسار/المعيار الحالي
+  const currentAxisName = evaluationAxes.find(a => a.id === selectedAxis)?.name || selectedAxis;
+  const currentTrackName = tracks.find(t => t.id === selectedTrack)?.name || selectedTrack;
+
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl" dir="rtl">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/dashboard")}>
-            <ArrowRight className="w-5 h-5" />
+            <ArrowRight className="w-5 h-5 rotate-180" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold">{isEdit ? "تعديل تقرير التقييم" : "تقرير تقييم جديد"}</h1>
             <p className="text-muted-foreground text-sm">
-              {company === "quraish" ? "شركة قريش" : "شركة أذان"}
+              {company === "quraish" ? "شركة قريش المحدودة" : "شركة أذان المحدودة"}
             </p>
           </div>
         </div>
         {entityId && (
-          <Button variant="outline" onClick={handleExportPDF} disabled={generating}>
-            {generating ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <FileDown className="w-4 h-4 ml-2" />}
-            تصدير PDF
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setPreviewOpen(true)} className="gap-2">
+              <Eye className="w-4 h-4" />
+              معاينة PDF
+            </Button>
+            <Button variant="outline" onClick={handleExportPDF} disabled={generating} className="gap-2">
+              {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+              تنزيل PDF
+            </Button>
+          </div>
         )}
       </div>
 
@@ -267,6 +340,16 @@ export default function EvaluationForm() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* عرض البيانات المحفوظة للتقارير القديمة */}
+            {isEdit && existingReport && (!selectedAxis || !selectedTrack || !selectedCriterion) && (
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm">
+                <p className="font-medium text-amber-800 mb-1">البيانات المحفوظة:</p>
+                <p className="text-amber-700">المحور: {existingReport.axis}</p>
+                <p className="text-amber-700">المسار: {existingReport.track}</p>
+                <p className="text-amber-700">المعيار: {existingReport.criterion}</p>
+              </div>
+            )}
           </div>
 
           {/* Score */}
@@ -301,26 +384,42 @@ export default function EvaluationForm() {
           </div>
 
           {/* File Upload */}
-          {entityId && (
+          {entityId ? (
             <div className="space-y-2">
               <Label>الشواهد والمرفقات</Label>
               <FileUploadZone entityType="evaluation" entityId={entityId} />
             </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">احفظ التقرير أولاً لإضافة المرفقات</p>
           )}
         </CardContent>
       </Card>
 
       {/* Actions */}
-      <div className="flex items-center gap-3 justify-end">
+      <div className="flex items-center gap-3 justify-start flex-wrap">
+        <Button variant="outline" onClick={() => setLocation("/dashboard")}>
+          إلغاء
+        </Button>
         <Button variant="outline" onClick={() => handleSave("draft")} disabled={isPending}>
           {isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Save className="w-4 h-4 ml-2" />}
           حفظ كمسودة
         </Button>
-        <Button onClick={() => handleSave("final")} disabled={isPending} className="navy-gradient">
+        <Button onClick={() => handleSave("final")} disabled={isPending}>
           {isPending ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
           اعتماد وحفظ
         </Button>
       </div>
+
+      {/* PDF Preview Modal */}
+      {entityId && (
+        <PdfPreviewModal
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          pdfUrl={`/api/pdf/evaluation/${entityId}`}
+          fileName={`تقرير_تقييم_${hijriDate.replace(/\//g, "-")}.pdf`}
+          title={`معاينة: ${currentAxisName || "تقرير التقييم"}`}
+        />
+      )}
     </div>
   );
 }

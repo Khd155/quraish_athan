@@ -1,0 +1,194 @@
+{
+  "query": "DESCRIBE evaluation_reports; SELECT id, axis, track, criterion, score, status FROM evaluation_reports LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user zN3FosM59T8MkKr.root --database TJtk4unPLR36oJYebaM6yg --execute DESCRIBE evaluation_reports; SELECT id, axis, track, criterion, score, status FROM evaluation_reports LIMIT 5;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "reportNumber",
+      "Type": "varchar(20)",
+      "Null": "NO",
+      "Key": "UNI",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "company",
+      "Type": "enum('quraish','azan')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "hijriDate",
+      "Type": "varchar(20)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "dayOfWeek",
+      "Type": "varchar(20)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "axis",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "track",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "criterion",
+      "Type": "varchar(500)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "score",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "notes",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "status",
+      "Type": "enum('draft','final')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "draft",
+      "Extra": ""
+    },
+    {
+      "Field": "createdById",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "createdByName",
+      "Type": "varchar(255)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "pdfUrl",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "pdfKey",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "createdAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updatedAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    },
+    {
+      "Field": "id",
+      "Type": "axis",
+      "Null": "track",
+      "Key": "criterion",
+      "Default": "score",
+      "Extra": "status"
+    },
+    {
+      "Field": "1",
+      "Type": "محور الالتزام والامتثال",
+      "Null": "الامتثال",
+      "Key": "التزام الشركة بمعالجة الملاحظات والمخالفات خلال المهلة المحددة",
+      "Default": "70",
+      "Extra": "final"
+    },
+    {
+      "Field": "30001",
+      "Type": "محور جودة أداء الخدمات",
+      "Null": "توثيق فعاليات وميدانيات فريق السعادة",
+      "Key": "قياس أثر فعاليات فريق السعادة على تجربة الحاج",
+      "Default": "53",
+      "Extra": "final"
+    },
+    {
+      "Field": "60001",
+      "Type": "محور الالتزام والامتثال",
+      "Null": "منهاج الشركات",
+      "Key": "وجود هيكل تنظيمي واضح ومعتمد",
+      "Default": "80",
+      "Extra": "final"
+    },
+    {
+      "Field": "90001",
+      "Type": "محور الالتزام والامتثال",
+      "Null": "جاهزية مخيمات المشاعر",
+      "Key": "توفر أنظمة السلامة والإطفاء في المخيمات",
+      "Default": "78",
+      "Extra": "final"
+    },
+    {
+      "Field": "120001",
+      "Type": "محور الالتزام والامتثال",
+      "Null": "الامتثال",
+      "Key": "التزام الشركة بتطبيق الأنظمة واللوائح الصادرة من الجهات الرقابية",
+      "Default": "44",
+      "Extra": "final"
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\nreportNumber\tvarchar(20)\tNO\tUNI\tNULL\t\ncompany\tenum('quraish','azan')\tNO\t\tNULL\t\nhijriDate\tvarchar(20)\tNO\t\tNULL\t\ndayOfWeek\tvarchar(20)\tNO\t\tNULL\t\naxis\tvarchar(255)\tNO\t\tNULL\t\ntrack\tvarchar(255)\tNO\t\tNULL\t\ncriterion\tvarchar(500)\tNO\t\tNULL\t\nscore\tint\tYES\t\tNULL\t\nnotes\ttext\tYES\t\tNULL\t\nstatus\tenum('draft','final')\tNO\t\tdraft\t\ncreatedById\tint\tNO\t\tNULL\t\ncreatedByName\tvarchar(255)\tYES\t\tNULL\t\npdfUrl\ttext\tYES\t\tNULL\t\npdfKey\ttext\tYES\t\tNULL\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\nid\taxis\ttrack\tcriterion\tscore\tstatus\n1\tمحور الالتزام والامتثال\tالامتثال\tالتزام الشركة بمعالجة الملاحظات والمخالفات خلال المهلة المحددة\t70\tfinal\n30001\tمحور جودة أداء الخدمات\tتوثيق فعاليات وميدانيات فريق السعادة\tقياس أثر فعاليات فريق السعادة على تجربة الحاج\t53\tfinal\n60001\tمحور الالتزام والامتثال\tمنهاج الشركات\tوجود هيكل تنظيمي واضح ومعتمد\t80\tfinal\n90001\tمحور الالتزام والامتثال\tجاهزية مخيمات المشاعر\tتوفر أنظمة السلامة والإطفاء في المخيمات\t78\tfinal\n120001\tمحور الالتزام والامتثال\tالامتثال\tالتزام الشركة بتطبيق الأنظمة واللوائح الصادرة من الجهات الرقابية\t44\tfinal\n",
+  "stderr": "",
+  "execution_time_ms": 1732
+}

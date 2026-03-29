@@ -4,16 +4,52 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
-import { ClipboardCheck, FileText, Search, Trash2 } from "lucide-react";
+import { ClipboardCheck, FileText, Search, Trash2, Eye, FileDown, Pencil } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import PdfPreviewModal from "@/components/PdfPreviewModal";
 
 export default function Archive() {
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("meetings");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewFileName, setPreviewFileName] = useState("");
+  const [previewTitle, setPreviewTitle] = useState("");
+
+  const openMeetingPreview = (m: { id: number; hijriDate: string; title: unknown }) => {
+    setPreviewUrl(`/api/pdf/meeting/${m.id}`);
+    setPreviewFileName(`محضر_اجتماع_${String(m.hijriDate).replace(/\//g, "-")}.pdf`);
+    setPreviewTitle(`معاينة: ${String(m.title)}`);
+    setPreviewOpen(true);
+  };
+
+  const openReportPreview = (r: { id: number; hijriDate: string; reportNumber: string }) => {
+    setPreviewUrl(`/api/pdf/evaluation/${r.id}`);
+    setPreviewFileName(`تقرير_تقييم_${String(r.hijriDate).replace(/\//g, "-")}.pdf`);
+    setPreviewTitle(`معاينة: تقرير ${r.reportNumber}`);
+    setPreviewOpen(true);
+  };
+
+  const downloadPdf = async (url: string, fileName: string) => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("فشل في تحميل PDF");
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(objUrl);
+      toast.success("تم تنزيل PDF");
+    } catch {
+      toast.error("فشل في تنزيل PDF");
+    }
+  };
 
   const { data: allMeetings, refetch: refetchMeetings } = trpc.meetings.all.useQuery(
     { company: companyFilter, search },
@@ -34,7 +70,7 @@ export default function Archive() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       <div>
         <h1 className="text-2xl font-bold">أرشيف المستندات</h1>
         <p className="text-muted-foreground">البحث في جميع المحاضر والتقارير</p>
@@ -102,14 +138,24 @@ export default function Archive() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       <span className={`text-xs px-2 py-1 rounded-full ${m.status === "final" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
                         {m.status === "final" ? "نهائي" : "مسودة"}
                       </span>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" title="معاينة PDF" onClick={() => openMeetingPreview(m)}>
+                        <Eye className="w-4 h-4 text-primary" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" title="تنزيل PDF" onClick={() => downloadPdf(`/api/pdf/meeting/${m.id}`, `محضر_اجتماع_${String(m.hijriDate).replace(/\//g, "-")}.pdf`)}>
+                        <FileDown className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" title="تعديل" onClick={() => setLocation(`/meetings/${m.id}`)}>
+                        <Pencil className="w-4 h-4 text-muted-foreground" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
+                        title="حذف"
                         onClick={() => {
                           if (confirm("هل أنت متأكد من حذف هذا المحضر؟")) {
                             deleteMeetingMutation.mutate({ id: m.id });
@@ -152,14 +198,24 @@ export default function Archive() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       <span className={`text-xs px-2 py-1 rounded-full ${r.status === "final" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
                         {r.status === "final" ? "نهائي" : "مسودة"}
                       </span>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" title="معاينة PDF" onClick={() => openReportPreview(r)}>
+                        <Eye className="w-4 h-4 text-primary" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" title="تنزيل PDF" onClick={() => downloadPdf(`/api/pdf/evaluation/${r.id}`, `تقرير_تقييم_${String(r.hijriDate).replace(/\//g, "-")}.pdf`)}>
+                        <FileDown className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" title="تعديل" onClick={() => setLocation(`/evaluations/${r.id}`)}>
+                        <Pencil className="w-4 h-4 text-muted-foreground" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
+                        title="حذف"
                         onClick={() => {
                           if (confirm("هل أنت متأكد من حذف هذا التقرير؟")) {
                             deleteReportMutation.mutate({ id: r.id });
@@ -176,6 +232,15 @@ export default function Archive() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* PDF Preview Modal */}
+      <PdfPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        pdfUrl={previewUrl}
+        fileName={previewFileName}
+        title={previewTitle}
+      />
     </div>
   );
 }

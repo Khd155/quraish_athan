@@ -1,0 +1,9 @@
+{
+  "query": "SELECT id, title, company, hijriDate, status, elements FROM meetings LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user zN3FosM59T8MkKr.root --database TJtk4unPLR36oJYebaM6yg --execute SELECT id, title, company, hijriDate, status, elements FROM meetings LIMIT 5;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1561
+}

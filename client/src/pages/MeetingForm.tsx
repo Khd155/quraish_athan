@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { DAYS_OF_WEEK, gregorianToHijri, formatHijriDate, getDayOfWeek, getDayFromHijriDate, hijriToGregorian } from "@shared/hijriUtils";
-import { ArrowRight, Loader2, Plus, Save, X, FileDown } from "lucide-react";
+import { ArrowRight, Loader2, Plus, Save, X, FileDown, Eye } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import FileUploadZone from "@/components/FileUploadZone";
+import PdfPreviewModal from "@/components/PdfPreviewModal";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 const DEPARTMENTS = [
@@ -40,6 +41,7 @@ export default function MeetingForm() {
   const [attendees, setAttendees] = useState<string[]>([""]);
   const [entityId, setEntityId] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Auto-detect: set today's hijri date and day
   useEffect(() => {
@@ -142,7 +144,7 @@ export default function MeetingForm() {
     }
   };
 
-  // PDF Export
+  // PDF Export (direct download)
   const handleExportPDF = async () => {
     if (!entityId) {
       toast.error("يرجى حفظ المحضر أولاً");
@@ -151,7 +153,10 @@ export default function MeetingForm() {
     setGenerating(true);
     try {
       const res = await fetch(`/api/pdf/meeting/${entityId}`);
-      if (!res.ok) throw new Error("فشل في إنشاء PDF");
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "فشل في إنشاء PDF");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -221,10 +226,16 @@ export default function MeetingForm() {
           </div>
         </div>
         {entityId && (
-          <Button variant="outline" onClick={handleExportPDF} disabled={generating}>
-            {generating ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <FileDown className="w-4 h-4 ml-2" />}
-            تصدير PDF
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setPreviewOpen(true)} className="gap-2">
+              <Eye className="w-4 h-4" />
+              معاينة PDF
+            </Button>
+            <Button variant="outline" onClick={handleExportPDF} disabled={generating} className="gap-2">
+              {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+              تنزيل PDF
+            </Button>
+          </div>
         )}
       </div>
 
@@ -396,7 +407,11 @@ export default function MeetingForm() {
           {/* Attachments */}
           <div className="space-y-2">
             <Label>الشواهد والمرفقات</Label>
-            {entityId && <FileUploadZone entityType="meeting" entityId={entityId} />}
+            {entityId ? (
+              <FileUploadZone entityType="meeting" entityId={entityId} />
+            ) : (
+              <p className="text-sm text-muted-foreground">احفظ المحضر أولاً لإضافة المرفقات</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -423,6 +438,16 @@ export default function MeetingForm() {
           حفظ واعتماد
         </Button>
       </div>
+      {/* PDF Preview Modal */}
+      {entityId && (
+        <PdfPreviewModal
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          pdfUrl={`/api/pdf/meeting/${entityId}`}
+          fileName={`محضر_اجتماع_${hijriDate.replace(/\//g, "-")}.pdf`}
+          title={`معاينة: ${title || "محضر الاجتماع"}`}
+        />
+      )}
     </div>
   );
 }
