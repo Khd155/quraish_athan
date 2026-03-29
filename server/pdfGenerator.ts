@@ -1,19 +1,10 @@
 /**
  * خدمة توليد PDF في Node.js مع دعم كامل للعربية وRTL
- * تستخدم مكتبة pdf-lib مع خط Cairo العربي
+ * تستخدم مكتبة pdf-lib مع خط Cairo العربي المضمّن
  */
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-
-// خط Cairo العربي من CDN (يعمل في Production)
-const CAIRO_FONT_URL =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663346868864/TJtk4unPLR36oJYebaM6yg/Cairo-Regular_e90cf28f.ttf";
-
-// شعارات الشركتين
-const QURAISH_LOGO =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663346868864/TJtk4unPLR36oJYebaM6yg/quraish-logo_1ecf0210.png";
-const AZAN_LOGO =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663346868864/TJtk4unPLR36oJYebaM6yg/azan-logo_ef925323.png";
+import { CAIRO_FONT_BASE64 } from "./cairoFontBase64";
 
 // ألوان
 const COLOR_PRIMARY = rgb(0.1, 0.3, 0.6); // أزرق داكن
@@ -23,13 +14,13 @@ const COLOR_GRAY = rgb(0.5, 0.5, 0.5);
 const COLOR_LIGHT_BG = rgb(0.96, 0.97, 0.99);
 const COLOR_WHITE = rgb(1, 1, 1);
 
-// تحميل الخط مرة واحدة
+// تحميل الخط من Base64 المضمّن (يعمل في Production بدون اتصال خارجي)
 let cachedFontBytes: ArrayBuffer | null = null;
 async function loadCairoFont(): Promise<ArrayBuffer> {
   if (cachedFontBytes) return cachedFontBytes;
-  const res = await fetch(CAIRO_FONT_URL);
-  if (!res.ok) throw new Error(`Failed to load Cairo font: ${res.status}`);
-  cachedFontBytes = await res.arrayBuffer();
+  // الخط مضمّن مباشرة في الكود - لا حاجة لاتصال خارجي
+  const buffer = Buffer.from(CAIRO_FONT_BASE64, 'base64');
+  cachedFontBytes = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
   return cachedFontBytes;
 }
 
