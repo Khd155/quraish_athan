@@ -1,206 +1,140 @@
 /**
- * خدمة توليد PDF باستخدام Puppeteer (Chromium)
- * يدعم العربية وRTL بشكل كامل عبر HTML/CSS
+ * خدمة توليد PDF في Node.js مع دعم كامل للعربية وRTL
+ * تستخدم مكتبة pdf-lib مع خط Cairo العربي المضمّن
  */
-import puppeteer from "puppeteer-core";
+import { PDFDocument, rgb } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+import { CAIRO_FONT_BASE64 } from "./cairoFontBase64";
 
-// مسار Chromium في النظام
-const CHROMIUM_PATH =
-  process.env.CHROMIUM_PATH ||
-  "/usr/bin/chromium-browser";
+// ألوان
+const COLOR_PRIMARY = rgb(0.1, 0.3, 0.6); // أزرق داكن
+const COLOR_ACCENT = rgb(0.9, 0.6, 0.1);  // ذهبي
+const COLOR_DARK = rgb(0.15, 0.15, 0.15);
+const COLOR_GRAY = rgb(0.5, 0.5, 0.5);
+const COLOR_LIGHT_BG = rgb(0.96, 0.97, 0.99);
+const COLOR_WHITE = rgb(1, 1, 1);
 
-// إنشاء browser مشترك (singleton)
-let browserInstance: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
-
-async function getBrowser() {
-  if (browserInstance) {
-    try {
-      // تحقق من أن المتصفح لا يزال يعمل
-      await browserInstance.version();
-      return browserInstance;
-    } catch {
-      browserInstance = null;
-    }
-  }
-  browserInstance = await puppeteer.launch({
-    executablePath: CHROMIUM_PATH,
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--no-first-run",
-      "--no-zygote",
-      "--single-process",
-    ],
-  });
-  return browserInstance;
+// تحميل الخط من Base64 المضمّن (يعمل في Production بدون اتصال خارجي)
+let cachedFontBytes: ArrayBuffer | null = null;
+async function loadCairoFont(): Promise<ArrayBuffer> {
+  if (cachedFontBytes) return cachedFontBytes;
+  // الخط مضمّن مباشرة في الكود - لا حاجة لاتصال خارجي
+  const buffer = Buffer.from(CAIRO_FONT_BASE64, 'base64');
+  cachedFontBytes = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+  return cachedFontBytes;
 }
 
-// ألوان الشركتين
-const COMPANY_COLORS = {
-  quraish: { primary: "#1a4a8a", accent: "#e6981a", name: "شركة قريش المحدودة" },
-  azan:    { primary: "#1a5c3a", accent: "#c8a820", name: "شركة أذان المحدودة" },
-};
+// عكس النص العربي للـ pdf-lib (RTL)
+function reverseArabic(text: string): string {
+  if (!text) return "";
+  // pdf-lib لا تدعم RTL مباشرة، نعكس الكلمات
+  return text.split(" ").reverse().join(" ");
+}
 
-// خريطة الإدارات
-const DEPT_MAP: Record<string, string> = {
-  technology:  "إدارة التقنية",
-  catering:    "إدارة الإعاشة",
-  transport:   "إدارة النقل",
-  cultural:    "الإدارة الثقافية",
-  media:       "الإدارة الإعلامية",
-  supervisors: "إدارة المشرفين",
-};
+// رسم مستطيل ملوّن
+function drawRect(
+  page: ReturnType<PDFDocument["addPage"]>,
+  x: number, y: number, w: number, h: number,
+  color: ReturnType<typeof rgb>
+) {
+  page.drawRectangle({ x, y, width: w, height: h, color });
+}
 
-// CSS المشترك لجميع ملفات PDF
-function getBaseCSS(primary: string, accent: string): string {
-  return `
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Cairo', 'Arial', sans-serif;
-      direction: rtl;
-      text-align: right;
-      color: #222;
-      background: #fff;
-      font-size: 13px;
-      line-height: 1.6;
+// كتابة نص مع دعم RTL (نعكس الكلمات)
+function drawText(
+  page: ReturnType<PDFDocument["addPage"]>,
+  text: string,
+  options: {
+    x: number; y: number; size: number;
+    font: Awaited<ReturnType<PDFDocument["embedFont"]>>;
+    color?: ReturnType<typeof rgb>;
+    maxWidth?: number;
+  }
+) {
+  if (!text) return;
+  const { x, y, size, font, color = COLOR_DARK, maxWidth } = options;
+  const reversed = reverseArabic(text);
+  if (maxWidth) {
+    // تقطيع النص إذا كان طويلاً
+    const words = reversed.split(" ");
+    let line = "";
+    let currentY = y;
+    for (const word of words) {
+      const testLine = line ? `${line} ${word}` : word;
+      const width = font.widthOfTextAtSize(testLine, size);
+      if (width > maxWidth && line) {
+        page.drawText(line, { x, y: currentY, size, font, color });
+        line = word;
+        currentY -= size * 1.5;
+      } else {
+        line = testLine;
+      }
     }
-    .page { width: 210mm; min-height: 297mm; padding: 0; position: relative; }
-    /* Header */
-    .header {
-      background: ${primary};
-      color: white;
-      padding: 18px 28px 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    if (line) page.drawText(line, { x, y: currentY, size, font, color });
+  } else {
+    page.drawText(reversed, { x, y, size, font, color });
+  }
+}
+
+// حساب عرض النص
+function textWidth(
+  text: string,
+  font: Awaited<ReturnType<PDFDocument["embedFont"]>>,
+  size: number
+): number {
+  return font.widthOfTextAtSize(reverseArabic(text), size);
+}
+
+// رسم نص محاذى لليمين
+function drawTextRight(
+  page: ReturnType<PDFDocument["addPage"]>,
+  text: string,
+  options: {
+    rightX: number; y: number; size: number;
+    font: Awaited<ReturnType<PDFDocument["embedFont"]>>;
+    color?: ReturnType<typeof rgb>;
+    maxWidth?: number;
+  }
+) {
+  if (!text) return;
+  const { rightX, y, size, font, color = COLOR_DARK, maxWidth } = options;
+  const reversed = reverseArabic(text);
+  const w = font.widthOfTextAtSize(reversed, size);
+  const x = rightX - w;
+  if (maxWidth && w > maxWidth) {
+    // تقطيع
+    const words = reversed.split(" ");
+    let line = "";
+    let currentY = y;
+    for (const word of words) {
+      const testLine = line ? `${line} ${word}` : word;
+      const lineW = font.widthOfTextAtSize(testLine, size);
+      if (lineW > maxWidth && line) {
+        const lw = font.widthOfTextAtSize(line, size);
+        page.drawText(line, { x: rightX - lw, y: currentY, size, font, color });
+        line = word;
+        currentY -= size * 1.6;
+      } else {
+        line = testLine;
+      }
     }
-    .header-right { text-align: right; }
-    .header-left  { text-align: left; font-size: 11px; opacity: 0.85; }
-    .company-name { font-size: 20px; font-weight: 700; margin-bottom: 3px; }
-    .doc-type     { font-size: 12px; opacity: 0.85; }
-    .accent-bar   { height: 5px; background: ${accent}; }
-    /* Info bar */
-    .info-bar {
-      background: #f0f4fa;
-      border-right: 4px solid ${accent};
-      padding: 10px 20px;
-      margin: 18px 28px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
-      color: ${primary};
-      font-weight: 600;
-      border-radius: 4px;
+    if (line) {
+      const lw = font.widthOfTextAtSize(line, size);
+      page.drawText(line, { x: rightX - lw, y: currentY, size, font, color });
     }
-    /* Content */
-    .content { padding: 18px 28px; }
-    .meeting-title {
-      font-size: 17px;
-      font-weight: 700;
-      color: #1a1a1a;
-      margin-bottom: 6px;
-      padding-bottom: 8px;
-      border-bottom: 2.5px solid ${accent};
-    }
-    /* Section */
-    .section { margin-top: 18px; }
-    .section-header {
-      background: ${primary};
-      color: white;
-      padding: 7px 14px;
-      font-size: 12px;
-      font-weight: 700;
-      border-radius: 4px 4px 0 0;
-    }
-    .section-body { border: 1px solid #dde4f0; border-top: none; border-radius: 0 0 4px 4px; }
-    .row {
-      padding: 8px 14px;
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      border-bottom: 1px solid #eef1f8;
-    }
-    .row:last-child { border-bottom: none; }
-    .row:nth-child(even) { background: #f7f9fd; }
-    .row-num {
-      color: ${accent};
-      font-weight: 700;
-      font-size: 11px;
-      min-width: 20px;
-      text-align: center;
-      flex-shrink: 0;
-    }
-    .row-text { flex: 1; font-size: 12px; }
-    /* Attendees grid */
-    .attendees-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0;
-    }
-    .attendee-cell {
-      padding: 7px 14px;
-      font-size: 12px;
-      border-bottom: 1px solid #eef1f8;
-      border-left: 1px solid #eef1f8;
-    }
-    .attendee-cell:nth-child(odd) { border-left: none; }
-    /* Data rows for evaluation */
-    .data-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 14px;
-      border-bottom: 1px solid #eef1f8;
-    }
-    .data-row:last-child { border-bottom: none; }
-    .data-row:nth-child(even) { background: #f7f9fd; }
-    .data-label { font-size: 10px; color: #888; font-weight: 600; }
-    .data-value { font-size: 12px; font-weight: 600; color: #222; max-width: 70%; text-align: right; }
-    /* Score */
-    .score-box {
-      background: #f7f9fd;
-      border-right: 4px solid ${accent};
-      padding: 16px 20px;
-      margin: 18px 0;
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      border-radius: 0 4px 4px 0;
-    }
-    .score-number { font-size: 48px; font-weight: 700; line-height: 1; }
-    .score-label  { font-size: 11px; color: #888; margin-bottom: 4px; }
-    .score-info   { flex: 1; }
-    .progress-bar { height: 8px; background: #dde4f0; border-radius: 4px; margin-top: 8px; overflow: hidden; }
-    .progress-fill { height: 100%; border-radius: 4px; }
-    /* Footer */
-    .footer {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      background: ${primary};
-      color: rgba(255,255,255,0.85);
-      padding: 10px 28px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 9px;
-    }
-    /* Signature */
-    .signature-area {
-      margin-top: 24px;
-      padding-top: 8px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 60px;
-    }
-    .signature-block { text-align: center; }
-    .signature-line { width: 120px; border-top: 1px solid #aaa; margin-bottom: 6px; }
-    .signature-name { font-size: 10px; color: #555; }
-    .signature-role { font-size: 9px; color: #aaa; }
-  `;
+  } else {
+    page.drawText(reversed, { x, y, size, font, color });
+  }
+}
+
+// رسم خط أفقي
+function drawLine(
+  page: ReturnType<PDFDocument["addPage"]>,
+  x1: number, y1: number, x2: number, y2: number,
+  color: ReturnType<typeof rgb> = COLOR_GRAY,
+  thickness = 0.5
+) {
+  page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness, color });
 }
 
 // ===== توليد PDF المحضر =====
@@ -217,96 +151,262 @@ export async function generateMeetingPdf(data: {
   meetingNumber?: string;
   createdByName?: string;
 }): Promise<Buffer> {
-  const colors = COMPANY_COLORS[data.company as keyof typeof COMPANY_COLORS] || COMPANY_COLORS.quraish;
-  const deptLabel = data.department ? (DEPT_MAP[data.department] || data.department) : "";
-  const elements = (data.elements || "").split("\n").filter(e => e.trim());
-  const recs = (data.recommendations || "").split("\n").filter(r => r.trim());
-  const attendees = (data.attendees || []).filter(a => a.trim());
+  const fontBytes = await loadCairoFont();
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.registerFontkit(fontkit);
+  const arabicFont = await pdfDoc.embedFont(fontBytes);
 
-  const scoreColor = (score: number) =>
-    score >= 70 ? "#1a9e3a" : score >= 50 ? "#e6981a" : "#d32f2f";
+  const page = pdfDoc.addPage([595, 842]); // A4
+  const { width, height } = page.getSize();
+  const margin = 45;
+  const contentWidth = width - margin * 2;
+  const rightEdge = width - margin;
 
-  const html = `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>${getBaseCSS(colors.primary, colors.accent)}</style>
-</head>
-<body>
-<div class="page">
-  <div class="header">
-    <div class="header-right">
-      <div class="company-name">${colors.name}</div>
-      <div class="doc-type">محضر اجتماع</div>
-    </div>
-    <div class="header-left">
-      ${data.meetingNumber ? `<div>رقم: ${data.meetingNumber}</div>` : ""}
-    </div>
-  </div>
-  <div class="accent-bar"></div>
+  // ===== Header =====
+  drawRect(page, 0, height - 80, width, 80, COLOR_PRIMARY);
+  // شريط ذهبي
+  drawRect(page, 0, height - 85, width, 5, COLOR_ACCENT);
 
-  <div class="info-bar">
-    <span>${data.dayOfWeek}  |  ${data.hijriDate}</span>
-    ${deptLabel ? `<span>${deptLabel}</span>` : ""}
-  </div>
+  // عنوان الشركة
+  const companyName = data.company === "quraish"
+    ? "شركة قريش المحدودة"
+    : "شركة أذان المحدودة";
+  const companyW = textWidth(companyName, arabicFont, 18);
+  page.drawText(reverseArabic(companyName), {
+    x: rightEdge - companyW,
+    y: height - 38,
+    size: 18,
+    font: arabicFont,
+    color: COLOR_WHITE,
+  });
 
-  <div class="content">
-    <div class="meeting-title">${data.title || "—"}</div>
+  // "محضر اجتماع"
+  const docTypeW = textWidth("محضر اجتماع", arabicFont, 12);
+  page.drawText(reverseArabic("محضر اجتماع"), {
+    x: rightEdge - docTypeW,
+    y: height - 60,
+    size: 12,
+    font: arabicFont,
+    color: rgb(0.85, 0.9, 1),
+  });
 
-    ${elements.length > 0 ? `
-    <div class="section">
-      <div class="section-header">عناصر الاجتماع</div>
-      <div class="section-body">
-        ${elements.map((item, i) => `
-          <div class="row">
-            <span class="row-num">${i + 1}</span>
-            <span class="row-text">${item}</span>
-          </div>`).join("")}
-      </div>
-    </div>` : ""}
+  // رقم المحضر
+  if (data.meetingNumber) {
+    const numText = `رقم: ${data.meetingNumber}`;
+    page.drawText(reverseArabic(numText), {
+      x: margin,
+      y: height - 50,
+      size: 10,
+      font: arabicFont,
+      color: rgb(0.85, 0.9, 1),
+    });
+  }
 
-    ${recs.length > 0 ? `
-    <div class="section">
-      <div class="section-header">التوصيات</div>
-      <div class="section-body">
-        ${recs.map((rec, i) => `
-          <div class="row">
-            <span class="row-num">${i + 1}</span>
-            <span class="row-text">${rec}</span>
-          </div>`).join("")}
-      </div>
-    </div>` : ""}
+  // ===== Info Bar =====
+  let y = height - 110;
+  drawRect(page, margin, y - 5, contentWidth, 32, COLOR_LIGHT_BG);
+  drawRect(page, margin, y - 5, 3, 32, COLOR_ACCENT);
 
-    ${attendees.length > 0 ? `
-    <div class="section">
-      <div class="section-header">الحضور</div>
-      <div class="section-body">
-        <div class="attendees-grid">
-          ${attendees.map(att => `<div class="attendee-cell">${att}</div>`).join("")}
-        </div>
-      </div>
-    </div>` : ""}
+  // التاريخ والقسم
+  const dateText = `${data.dayOfWeek}  |  ${data.hijriDate}`;
+  const dateW = textWidth(dateText, arabicFont, 10);
+  page.drawText(reverseArabic(dateText), {
+    x: rightEdge - dateW,
+    y: y + 8,
+    size: 10,
+    font: arabicFont,
+    color: COLOR_PRIMARY,
+  });
 
-    ${data.createdByName ? `
-    <div class="signature-area">
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-name">${data.createdByName}</div>
-        <div class="signature-role">المُعِد</div>
-      </div>
-    </div>` : ""}
-  </div>
+  if (data.department) {
+    const deptMap: Record<string, string> = {
+      technology: "إدارة التقنية",
+      catering: "إدارة الإعاشة",
+      transport: "إدارة النقل",
+      cultural: "الإدارة الثقافية",
+      media: "الإدارة الإعلامية",
+      supervisors: "إدارة المشرفين",
+    };
+    const deptLabel = deptMap[data.department] || data.department;
+    page.drawText(reverseArabic(deptLabel), {
+      x: margin + 10,
+      y: y + 8,
+      size: 10,
+      font: arabicFont,
+      color: COLOR_GRAY,
+    });
+  }
 
-  <div class="footer">
-    <span>${colors.name}  |  نظام التوثيق</span>
-    <span>${new Date().toLocaleDateString("ar-SA")}</span>
-  </div>
-</div>
-</body>
-</html>`;
+  // ===== عنوان الاجتماع =====
+  y -= 45;
+  const titleW = textWidth(data.title, arabicFont, 15);
+  page.drawText(reverseArabic(data.title), {
+    x: rightEdge - Math.min(titleW, contentWidth),
+    y,
+    size: 15,
+    font: arabicFont,
+    color: COLOR_DARK,
+  });
+  y -= 8;
+  drawLine(page, margin, y, rightEdge, y, COLOR_ACCENT, 1.5);
 
-  return renderHtmlToPdf(html);
+  // ===== عناصر الاجتماع =====
+  y -= 28;
+  if (data.elements) {
+    // عنوان القسم
+    drawRect(page, margin, y - 3, contentWidth, 22, COLOR_PRIMARY);
+    const secW = textWidth("عناصر الاجتماع", arabicFont, 11);
+    page.drawText(reverseArabic("عناصر الاجتماع"), {
+      x: rightEdge - secW,
+      y: y + 4,
+      size: 11,
+      font: arabicFont,
+      color: COLOR_WHITE,
+    });
+    y -= 28;
+
+    const items = data.elements.split("\n").filter(e => e.trim());
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i].trim();
+      if (!item) continue;
+      // خلفية متناوبة
+      if (i % 2 === 0) {
+        drawRect(page, margin, y - 4, contentWidth, 20, COLOR_LIGHT_BG);
+      }
+      // رقم البند
+      page.drawText(String(i + 1), {
+        x: margin + 5,
+        y: y + 2,
+        size: 9,
+        font: arabicFont,
+        color: COLOR_ACCENT,
+      });
+      // نص البند
+      const itemW = textWidth(item, arabicFont, 10);
+      const itemX = rightEdge - Math.min(itemW, contentWidth - 25);
+      page.drawText(reverseArabic(item), {
+        x: itemX,
+        y: y + 2,
+        size: 10,
+        font: arabicFont,
+        color: COLOR_DARK,
+      });
+      y -= 22;
+      if (y < 100) break;
+    }
+  }
+
+  // ===== التوصيات =====
+  if (data.recommendations && y > 120) {
+    y -= 15;
+    drawRect(page, margin, y - 3, contentWidth, 22, COLOR_PRIMARY);
+    const recW = textWidth("التوصيات", arabicFont, 11);
+    page.drawText(reverseArabic("التوصيات"), {
+      x: rightEdge - recW,
+      y: y + 4,
+      size: 11,
+      font: arabicFont,
+      color: COLOR_WHITE,
+    });
+    y -= 28;
+
+    const recs = data.recommendations.split("\n").filter(r => r.trim());
+    for (let i = 0; i < recs.length; i++) {
+      const rec = recs[i].trim();
+      if (!rec) continue;
+      if (i % 2 === 0) {
+        drawRect(page, margin, y - 4, contentWidth, 20, COLOR_LIGHT_BG);
+      }
+      page.drawText(String(i + 1), {
+        x: margin + 5,
+        y: y + 2,
+        size: 9,
+        font: arabicFont,
+        color: COLOR_ACCENT,
+      });
+      const recW2 = textWidth(rec, arabicFont, 10);
+      page.drawText(reverseArabic(rec), {
+        x: rightEdge - Math.min(recW2, contentWidth - 25),
+        y: y + 2,
+        size: 10,
+        font: arabicFont,
+        color: COLOR_DARK,
+      });
+      y -= 22;
+      if (y < 100) break;
+    }
+  }
+
+  // ===== الحضور =====
+  if (data.attendees?.length > 0 && y > 120) {
+    y -= 15;
+    drawRect(page, margin, y - 3, contentWidth, 22, COLOR_PRIMARY);
+    const attW = textWidth("الحضور", arabicFont, 11);
+    page.drawText(reverseArabic("الحضور"), {
+      x: rightEdge - attW,
+      y: y + 4,
+      size: 11,
+      font: arabicFont,
+      color: COLOR_WHITE,
+    });
+    y -= 28;
+
+    const validAttendees = data.attendees.filter(a => a.trim());
+    const colW = contentWidth / 2 - 5;
+    for (let i = 0; i < validAttendees.length; i += 2) {
+      if (i % 4 === 0) {
+        drawRect(page, margin, y - 4, contentWidth, 20, COLOR_LIGHT_BG);
+      }
+      const att1 = validAttendees[i];
+      const att1W = textWidth(att1, arabicFont, 10);
+      page.drawText(reverseArabic(att1), {
+        x: rightEdge - Math.min(att1W, colW),
+        y: y + 2,
+        size: 10,
+        font: arabicFont,
+        color: COLOR_DARK,
+      });
+      if (validAttendees[i + 1]) {
+        const att2 = validAttendees[i + 1];
+        const att2W = textWidth(att2, arabicFont, 10);
+        page.drawText(reverseArabic(att2), {
+          x: margin + colW - Math.min(att2W, colW),
+          y: y + 2,
+          size: 10,
+          font: arabicFont,
+          color: COLOR_DARK,
+        });
+      }
+      y -= 22;
+      if (y < 100) break;
+    }
+  }
+
+  // ===== Footer =====
+  drawRect(page, 0, 0, width, 40, COLOR_PRIMARY);
+  drawRect(page, 0, 40, width, 2, COLOR_ACCENT);
+
+  const footerText = `${companyName}  |  نظام التوثيق`;
+  const footerW = textWidth(footerText, arabicFont, 9);
+  page.drawText(reverseArabic(footerText), {
+    x: rightEdge - footerW,
+    y: 15,
+    size: 9,
+    font: arabicFont,
+    color: rgb(0.85, 0.9, 1),
+  });
+
+  const dateFooter = new Date().toLocaleDateString("ar-SA");
+  page.drawText(reverseArabic(dateFooter), {
+    x: margin,
+    y: 15,
+    size: 9,
+    font: arabicFont,
+    color: rgb(0.85, 0.9, 1),
+  });
+
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
 }
 
 // ===== توليد PDF تقرير التقييم =====
@@ -323,110 +423,232 @@ export async function generateEvaluationPdf(data: {
   notes: string;
   createdByName?: string;
 }): Promise<Buffer> {
-  const colors = COMPANY_COLORS[data.company as keyof typeof COMPANY_COLORS] || COMPANY_COLORS.quraish;
-  const scoreColor = data.score >= 70 ? "#1a9e3a" : data.score >= 50 ? "#e6981a" : "#d32f2f";
-  const progressPct = Math.min(100, Math.max(0, data.score));
+  const fontBytes = await loadCairoFont();
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.registerFontkit(fontkit);
+  const arabicFont = await pdfDoc.embedFont(fontBytes);
 
-  const html = `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <style>${getBaseCSS(colors.primary, colors.accent)}</style>
-</head>
-<body>
-<div class="page">
-  <div class="header">
-    <div class="header-right">
-      <div class="company-name">${colors.name}</div>
-      <div class="doc-type">تقرير تقييم الأداء</div>
-    </div>
-    <div class="header-left">
-      <div>رقم: ${data.reportNumber}</div>
-    </div>
-  </div>
-  <div class="accent-bar"></div>
+  const page = pdfDoc.addPage([595, 842]);
+  const { width, height } = page.getSize();
+  const margin = 45;
+  const contentWidth = width - margin * 2;
+  const rightEdge = width - margin;
 
-  <div class="info-bar">
-    <span>${data.dayOfWeek}  |  ${data.hijriDate}</span>
-  </div>
+  // ===== Header =====
+  drawRect(page, 0, height - 80, width, 80, COLOR_PRIMARY);
+  drawRect(page, 0, height - 85, width, 5, COLOR_ACCENT);
 
-  <div class="content">
-    <div class="section">
-      <div class="section-header">بيانات التقييم</div>
-      <div class="section-body">
-        <div class="data-row">
-          <span class="data-label">المحور</span>
-          <span class="data-value">${data.axis || "—"}</span>
-        </div>
-        <div class="data-row">
-          <span class="data-label">المسار</span>
-          <span class="data-value">${data.track || "—"}</span>
-        </div>
-        <div class="data-row">
-          <span class="data-label">المعيار</span>
-          <span class="data-value">${data.criterion || "—"}</span>
-        </div>
-      </div>
-    </div>
+  const companyName = data.company === "quraish"
+    ? "شركة قريش المحدودة"
+    : "شركة أذان المحدودة";
+  const companyW = textWidth(companyName, arabicFont, 18);
+  page.drawText(reverseArabic(companyName), {
+    x: rightEdge - companyW,
+    y: height - 38,
+    size: 18,
+    font: arabicFont,
+    color: COLOR_WHITE,
+  });
 
-    <div class="score-box">
-      <div>
-        <div class="score-label">الدرجة المحققة</div>
-        <div class="score-number" style="color:${scoreColor}">${data.score}</div>
-        <div style="font-size:11px;color:#888">من 100</div>
-      </div>
-      <div class="score-info">
-        <div style="font-size:12px;font-weight:600;color:${scoreColor}">
-          ${data.score >= 70 ? "ممتاز" : data.score >= 50 ? "جيد" : "يحتاج تحسين"}
-        </div>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width:${progressPct}%;background:${scoreColor}"></div>
-        </div>
-      </div>
-    </div>
+  const docTypeW = textWidth("تقرير تقييم الأداء", arabicFont, 12);
+  page.drawText(reverseArabic("تقرير تقييم الأداء"), {
+    x: rightEdge - docTypeW,
+    y: height - 60,
+    size: 12,
+    font: arabicFont,
+    color: rgb(0.85, 0.9, 1),
+  });
 
-    ${data.notes ? `
-    <div class="section">
-      <div class="section-header">الملاحظات</div>
-      <div class="section-body">
-        <div style="padding:12px 14px;font-size:12px;line-height:1.8">${data.notes.replace(/\n/g, "<br>")}</div>
-      </div>
-    </div>` : ""}
+  // رقم التقرير
+  page.drawText(reverseArabic(`رقم: ${data.reportNumber}`), {
+    x: margin,
+    y: height - 50,
+    size: 10,
+    font: arabicFont,
+    color: rgb(0.85, 0.9, 1),
+  });
 
-    ${data.createdByName ? `
-    <div class="signature-area">
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-name">${data.createdByName}</div>
-        <div class="signature-role">المُعِد</div>
-      </div>
-    </div>` : ""}
-  </div>
+  // ===== Info Bar =====
+  let y = height - 110;
+  drawRect(page, margin, y - 5, contentWidth, 32, COLOR_LIGHT_BG);
+  drawRect(page, margin, y - 5, 3, 32, COLOR_ACCENT);
 
-  <div class="footer">
-    <span>${colors.name}  |  نظام التوثيق</span>
-    <span>${new Date().toLocaleDateString("ar-SA")}</span>
-  </div>
-</div>
-</body>
-</html>`;
+  const dateText = `${data.dayOfWeek}  |  ${data.hijriDate}`;
+  const dateW = textWidth(dateText, arabicFont, 10);
+  page.drawText(reverseArabic(dateText), {
+    x: rightEdge - dateW,
+    y: y + 8,
+    size: 10,
+    font: arabicFont,
+    color: COLOR_PRIMARY,
+  });
 
-  return renderHtmlToPdf(html);
-}
+  // ===== بيانات التقييم =====
+  y -= 45;
 
-// ===== دالة التوليد المشتركة =====
-async function renderHtmlToPdf(html: string): Promise<Buffer> {
-  const browser = await getBrowser();
-  const page = await browser.newPage();
-  try {
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "0", right: "0", bottom: "0", left: "0" },
+  // دالة رسم صف بيانات
+  const drawDataRow = (label: string, value: string, rowY: number, highlight = false) => {
+    if (highlight) {
+      drawRect(page, margin, rowY - 6, contentWidth, 26, COLOR_LIGHT_BG);
+    }
+    drawLine(page, margin, rowY - 6, rightEdge, rowY - 6, rgb(0.88, 0.9, 0.95));
+
+    // القيمة (يمين)
+    const valW = textWidth(value, arabicFont, 11);
+    page.drawText(reverseArabic(value), {
+      x: rightEdge - Math.min(valW, contentWidth * 0.65),
+      y: rowY + 2,
+      size: 11,
+      font: arabicFont,
+      color: COLOR_DARK,
     });
-    return Buffer.from(pdfBuffer);
-  } finally {
-    await page.close();
+    // التسمية (يسار)
+    page.drawText(reverseArabic(label), {
+      x: margin + 5,
+      y: rowY + 2,
+      size: 9,
+      font: arabicFont,
+      color: COLOR_GRAY,
+    });
+  };
+
+  // عنوان القسم
+  drawRect(page, margin, y - 3, contentWidth, 22, COLOR_PRIMARY);
+  const secW = textWidth("بيانات التقييم", arabicFont, 11);
+  page.drawText(reverseArabic("بيانات التقييم"), {
+    x: rightEdge - secW,
+    y: y + 4,
+    size: 11,
+    font: arabicFont,
+    color: COLOR_WHITE,
+  });
+  y -= 35;
+
+  drawDataRow("المحور", data.axis, y, true);
+  y -= 32;
+  drawDataRow("المسار", data.track, y, false);
+  y -= 32;
+  drawDataRow("المعيار", data.criterion, y, true);
+  y -= 50;
+
+  // ===== الدرجة =====
+  drawRect(page, margin, y - 10, contentWidth, 70, COLOR_LIGHT_BG);
+  drawRect(page, margin, y - 10, 4, 70, COLOR_ACCENT);
+
+  const scoreLabel = "الدرجة المحققة";
+  const scoreLabelW = textWidth(scoreLabel, arabicFont, 11);
+  page.drawText(reverseArabic(scoreLabel), {
+    x: rightEdge - scoreLabelW,
+    y: y + 35,
+    size: 11,
+    font: arabicFont,
+    color: COLOR_GRAY,
+  });
+
+  // الدرجة الكبيرة
+  const scoreText = `${data.score}`;
+  const scoreW = textWidth(scoreText, arabicFont, 36);
+  page.drawText(scoreText, {
+    x: rightEdge - scoreW,
+    y: y,
+    size: 36,
+    font: arabicFont,
+    color: data.score >= 70 ? rgb(0.1, 0.6, 0.2) : data.score >= 50 ? COLOR_ACCENT : rgb(0.8, 0.2, 0.2),
+  });
+
+  // من 100
+  page.drawText(reverseArabic("/ 100"), {
+    x: margin + 10,
+    y: y + 10,
+    size: 14,
+    font: arabicFont,
+    color: COLOR_GRAY,
+  });
+
+  // شريط التقدم
+  y -= 20;
+  drawRect(page, margin, y, contentWidth, 8, rgb(0.88, 0.9, 0.95));
+  const progressWidth = (data.score / 100) * contentWidth;
+  const progressColor = data.score >= 70
+    ? rgb(0.1, 0.6, 0.2)
+    : data.score >= 50 ? COLOR_ACCENT : rgb(0.8, 0.2, 0.2);
+  drawRect(page, margin, y, progressWidth, 8, progressColor);
+
+  // ===== الملاحظات =====
+  if (data.notes) {
+    y -= 35;
+    drawRect(page, margin, y - 3, contentWidth, 22, COLOR_PRIMARY);
+    const notesW = textWidth("الملاحظات", arabicFont, 11);
+    page.drawText(reverseArabic("الملاحظات"), {
+      x: rightEdge - notesW,
+      y: y + 4,
+      size: 11,
+      font: arabicFont,
+      color: COLOR_WHITE,
+    });
+    y -= 30;
+
+    drawRect(page, margin, y - 8, contentWidth, 60, COLOR_LIGHT_BG);
+    const notesLines = data.notes.split("\n");
+    for (const line of notesLines) {
+      if (!line.trim() || y < 100) break;
+      const lineW = textWidth(line, arabicFont, 10);
+      page.drawText(reverseArabic(line), {
+        x: rightEdge - Math.min(lineW, contentWidth - 10),
+        y,
+        size: 10,
+        font: arabicFont,
+        color: COLOR_DARK,
+      });
+      y -= 18;
+    }
   }
+
+  // ===== توقيع =====
+  if (data.createdByName && y > 150) {
+    y -= 40;
+    drawLine(page, margin, y, margin + 120, y, COLOR_GRAY);
+    const sigW = textWidth(data.createdByName, arabicFont, 9);
+    page.drawText(reverseArabic(data.createdByName), {
+      x: margin + 60 - sigW / 2,
+      y: y - 15,
+      size: 9,
+      font: arabicFont,
+      color: COLOR_GRAY,
+    });
+    const sigLabelW = textWidth("المُعِد", arabicFont, 8);
+    page.drawText(reverseArabic("المُعِد"), {
+      x: margin + 60 - sigLabelW / 2,
+      y: y - 27,
+      size: 8,
+      font: arabicFont,
+      color: COLOR_GRAY,
+    });
+  }
+
+  // ===== Footer =====
+  drawRect(page, 0, 0, width, 40, COLOR_PRIMARY);
+  drawRect(page, 0, 40, width, 2, COLOR_ACCENT);
+
+  const footerText = `${companyName}  |  نظام التوثيق`;
+  const footerW = textWidth(footerText, arabicFont, 9);
+  page.drawText(reverseArabic(footerText), {
+    x: rightEdge - footerW,
+    y: 15,
+    size: 9,
+    font: arabicFont,
+    color: rgb(0.85, 0.9, 1),
+  });
+
+  const dateFooter = new Date().toLocaleDateString("ar-SA");
+  page.drawText(reverseArabic(dateFooter), {
+    x: margin,
+    y: 15,
+    size: 9,
+    font: arabicFont,
+    color: rgb(0.85, 0.9, 1),
+  });
+
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
 }
