@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import PdfPreviewModal from "@/components/PdfPreviewModal";
+import { downloadPdf as downloadPdfUtil } from "@/lib/downloadPdf";
 
 export default function Archive() {
   const [, setLocation] = useLocation();
@@ -34,22 +35,7 @@ export default function Archive() {
     setPreviewOpen(true);
   };
 
-  const downloadPdf = async (url: string, fileName: string) => {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("فشل في تحميل PDF");
-      const blob = await res.blob();
-      const objUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objUrl;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(objUrl);
-      toast.success("تم تنزيل PDF");
-    } catch {
-      toast.error("فشل في تنزيل PDF");
-    }
-  };
+  const downloadPdf = (url: string, fileName: string) => downloadPdfUtil(url, fileName);
 
   const { data: allMeetings, refetch: refetchMeetings } = trpc.meetings.all.useQuery(
     { company: companyFilter, search },

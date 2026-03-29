@@ -15,6 +15,8 @@ import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import FileUploadZone from "@/components/FileUploadZone";
 import PdfPreviewModal from "@/components/PdfPreviewModal";
+import HijriDatePicker from "@/components/HijriDatePicker";
+import { downloadPdf } from "@/lib/downloadPdf";
 
 /**
  * يحوّل نص محفوظ (اسم كامل) إلى ID المقابل في قائمة البيانات
@@ -194,7 +196,7 @@ export default function EvaluationForm() {
     }
   };
 
-  // PDF Export (direct download)
+  // PDF Export - using reliable download utility
   const handleExportPDF = async () => {
     if (!entityId) {
       toast.error("يرجى حفظ التقرير أولاً");
@@ -202,21 +204,10 @@ export default function EvaluationForm() {
     }
     setGenerating(true);
     try {
-      const res = await fetch(`/api/pdf/evaluation/${entityId}`);
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || "فشل في إنشاء PDF");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `تقرير_تقييم_${hijriDate.replace(/\//g, "-")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("تم تصدير PDF بنجاح");
-    } catch (err: any) {
-      toast.error(err.message || "فشل في تصدير PDF");
+      await downloadPdf(
+        `/api/pdf/evaluation/${entityId}`,
+        `تقرير_تقييم_${hijriDate.replace(/\//g, "-")}.pdf`
+      );
     } finally {
       setGenerating(false);
     }
@@ -267,13 +258,7 @@ export default function EvaluationForm() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>التاريخ الهجري</Label>
-              <Input
-                value={hijriDate}
-                onChange={(e) => handleHijriDateChange(e.target.value)}
-                placeholder="1447/01/01"
-                dir="ltr"
-                className="text-center"
-              />
+              <HijriDatePicker value={hijriDate} onChange={handleHijriDateChange} />
             </div>
             <div className="space-y-2">
               <Label>اليوم</Label>

@@ -1,19 +1,21 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
-import { DAYS_OF_WEEK, gregorianToHijri, formatHijriDate, getDayOfWeek, getDayFromHijriDate, hijriToGregorian } from "@shared/hijriUtils";
-import { ArrowRight, Loader2, Plus, Save, X, FileDown, Eye } from "lucide-react";
+import { DAYS_OF_WEEK, getDayFromHijriDate, formatHijriDate, gregorianToHijri, getDayOfWeek } from "@shared/hijriUtils";
+import { ArrowRight, Loader2, Plus, X, FileDown, Eye } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import FileUploadZone from "@/components/FileUploadZone";
 import PdfPreviewModal from "@/components/PdfPreviewModal";
+import HijriDatePicker from "@/components/HijriDatePicker";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { downloadPdf } from "@/lib/downloadPdf";
 
 const DEPARTMENTS = [
   { value: "technology", label: "إدارة التقنية" },
@@ -32,7 +34,6 @@ export default function MeetingForm() {
   const company = localStorage.getItem("selectedCompany") as "quraish" | "azan" || "quraish";
 
   const [hijriDate, setHijriDate] = useState("");
-  const [gregorianDate, setGregorianDate] = useState("");
   const [dayOfWeek, setDayOfWeek] = useState("");
   const [title, setTitle] = useState("");
   const [elements, setElements] = useState<string[]>([""]);
@@ -48,38 +49,18 @@ export default function MeetingForm() {
     if (!isEdit) {
       const today = new Date();
       const h = gregorianToHijri(today);
-      setHijriDate(formatHijriDate(h.year, h.month, h.day));
-      setGregorianDate(today.toISOString().split("T")[0]);
+      const formatted = formatHijriDate(h.year, h.month, h.day);
+      setHijriDate(formatted);
       setDayOfWeek(getDayOfWeek(today));
     }
   }, [isEdit]);
 
-  // Auto-detect day from hijri date change (ربط ذكي)
+  // Auto-detect day when hijri date changes
   const handleHijriDateChange = useCallback((value: string) => {
     setHijriDate(value);
     const detectedDay = getDayFromHijriDate(value);
-    if (detectedDay) {
-      setDayOfWeek(detectedDay);
-    }
-    // Convert hijri to gregorian
-    const parts = value.split("/");
-    if (parts.length === 3) {
-      const hijriYear = parseInt(parts[0]);
-      const hijriMonth = parseInt(parts[1]);
-      const hijriDay = parseInt(parts[2]);
-      const g = hijriToGregorian(hijriYear, hijriMonth, hijriDay);
-      setGregorianDate(g.toISOString().split("T")[0]);
-    }
+    if (detectedDay) setDayOfWeek(detectedDay);
   }, []);
-
-  // Handle gregorian date change
-  const handleGregorianDateChange = (value: string) => {
-    setGregorianDate(value);
-    const date = new Date(value + "T00:00:00");
-    const h = gregorianToHijri(date);
-    setHijriDate(formatHijriDate(h.year, h.month, h.day));
-    setDayOfWeek(getDayOfWeek(date));
-  };
 
   // Load existing meeting for edit
   const { data: existingMeeting } = trpc.meetings.getById.useQuery(
@@ -90,10 +71,8 @@ export default function MeetingForm() {
   useEffect(() => {
     if (existingMeeting) {
       setHijriDate(existingMeeting.hijriDate);
-      setGregorianDate(existingMeeting.gregorianDate || "");
       setDayOfWeek(existingMeeting.dayOfWeek);
       setTitle(existingMeeting.title as string);
-      // Parse elements and recommendations as arrays
       const elemStr = (existingMeeting.elements as string) || "";
       setElements(elemStr ? elemStr.split("\n").filter(e => e.trim()) : [""]);
       const recStr = (existingMeeting.recommendations as string) || "";
@@ -125,7 +104,7 @@ export default function MeetingForm() {
     const data = {
       company,
       hijriDate,
-      gregorianDate,
+      gregorianDate: "", // لم نعد نستخدمه لكن الحقل موجود في قاعدة البيانات
       dayOfWeek,
       title: title.trim(),
       elements: elements.filter(e => e.trim()).join("\n"),
@@ -144,7 +123,7 @@ export default function MeetingForm() {
     }
   };
 
-  // PDF Export (direct download)
+  // PDF Export - using reliable download utility
   const handleExportPDF = async () => {
     if (!entityId) {
       toast.error("يرجى حفظ المحضر أولاً");
@@ -152,21 +131,10 @@ export default function MeetingForm() {
     }
     setGenerating(true);
     try {
-      const res = await fetch(`/api/pdf/meeting/${entityId}`);
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || "فشل في إنشاء PDF");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `محضر_اجتماع_${hijriDate.replace(/\//g, "-")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("تم تصدير PDF بنجاح");
-    } catch (err: any) {
-      toast.error(err.message || "فشل في تصدير PDF");
+      await downloadPdf(
+        `/api/pdf/meeting/${entityId}`,
+        `محضر_اجتماع_${hijriDate.replace(/\//g, "-")}.pdf`
+      );
     } finally {
       setGenerating(false);
     }
@@ -211,12 +179,12 @@ export default function MeetingForm() {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl" dir="rtl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/dashboard")}>
-            <ArrowRight className="w-5 h-5" />
+            <ArrowRight className="w-5 h-5 rotate-180" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold">{isEdit ? "تعديل محضر الاجتماع" : "محضر اجتماع جديد"}</h1>
@@ -245,26 +213,11 @@ export default function MeetingForm() {
           <CardTitle className="text-lg">بيانات المحضر</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {/* Dates Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Date Row - Hijri only */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>التاريخ الهجري</Label>
-              <Input
-                type="text"
-                value={hijriDate}
-                onChange={(e) => handleHijriDateChange(e.target.value)}
-                placeholder="1447/01/01"
-                dir="ltr"
-                className="text-center"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>التاريخ الميلادي</Label>
-              <Input
-                type="date"
-                value={gregorianDate}
-                onChange={(e) => handleGregorianDateChange(e.target.value)}
-              />
+              <HijriDatePicker value={hijriDate} onChange={handleHijriDateChange} />
             </div>
             <div className="space-y-2">
               <Label>اليوم</Label>
@@ -285,6 +238,7 @@ export default function MeetingForm() {
           <div className="space-y-2">
             <Label>عنوان الاجتماع</Label>
             <Input
+              type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="أدخل عنوان الاجتماع"
@@ -299,8 +253,8 @@ export default function MeetingForm() {
                 <SelectValue placeholder="اختر الإدارة" />
               </SelectTrigger>
               <SelectContent>
-                {DEPARTMENTS.map((dept) => (
-                  <SelectItem key={dept.value} value={dept.value}>{dept.label}</SelectItem>
+                {DEPARTMENTS.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -310,28 +264,24 @@ export default function MeetingForm() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>عناصر الاجتماع</Label>
-              <Button variant="ghost" size="sm" onClick={addElement}>
-                <Plus className="w-4 h-4 ml-1" /> إضافة عنصر
+              <Button type="button" variant="outline" size="sm" onClick={addElement} className="gap-1 h-7 text-xs">
+                <Plus className="w-3 h-3" />
+                إضافة عنصر
               </Button>
             </div>
             <div className="space-y-2">
-              {elements.map((element, index) => (
-                <div key={index} className="flex gap-2">
+              {elements.map((el, index) => (
+                <div key={index} className="flex gap-2 items-start">
                   <Textarea
-                    value={element}
+                    value={el}
                     onChange={(e) => updateElement(index, e.target.value)}
                     placeholder={`عنصر ${index + 1}`}
-                    className="flex-1"
                     rows={2}
+                    className="flex-1 resize-none"
                   />
                   {elements.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeElement(index)}
-                      className="text-destructive"
-                    >
-                      <X className="w-4 h-4" />
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 mt-1 shrink-0" onClick={() => removeElement(index)}>
+                      <X className="w-4 h-4 text-destructive" />
                     </Button>
                   )}
                 </div>
@@ -343,28 +293,24 @@ export default function MeetingForm() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>التوصيات</Label>
-              <Button variant="ghost" size="sm" onClick={addRecommendation}>
-                <Plus className="w-4 h-4 ml-1" /> إضافة توصية
+              <Button type="button" variant="outline" size="sm" onClick={addRecommendation} className="gap-1 h-7 text-xs">
+                <Plus className="w-3 h-3" />
+                إضافة توصية
               </Button>
             </div>
             <div className="space-y-2">
               {recommendations.map((rec, index) => (
-                <div key={index} className="flex gap-2">
+                <div key={index} className="flex gap-2 items-start">
                   <Textarea
                     value={rec}
                     onChange={(e) => updateRecommendation(index, e.target.value)}
                     placeholder={`توصية ${index + 1}`}
-                    className="flex-1"
                     rows={2}
+                    className="flex-1 resize-none"
                   />
                   {recommendations.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeRecommendation(index)}
-                      className="text-destructive"
-                    >
-                      <X className="w-4 h-4" />
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 mt-1 shrink-0" onClick={() => removeRecommendation(index)}>
+                      <X className="w-4 h-4 text-destructive" />
                     </Button>
                   )}
                 </div>
@@ -376,27 +322,23 @@ export default function MeetingForm() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>الحضور</Label>
-              <Button variant="ghost" size="sm" onClick={addAttendee}>
-                <Plus className="w-4 h-4 ml-1" /> إضافة حاضر
+              <Button type="button" variant="outline" size="sm" onClick={addAttendee} className="gap-1 h-7 text-xs">
+                <Plus className="w-3 h-3" />
+                إضافة حاضر
               </Button>
             </div>
             <div className="space-y-2">
-              {attendees.map((attendee, index) => (
-                <div key={index} className="flex gap-2">
+              {attendees.map((att, index) => (
+                <div key={index} className="flex gap-2 items-center">
                   <Input
-                    value={attendee}
+                    value={att}
                     onChange={(e) => updateAttendee(index, e.target.value)}
                     placeholder={`اسم الحاضر ${index + 1}`}
                     className="flex-1"
                   />
                   {attendees.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeAttendee(index)}
-                      className="text-destructive"
-                    >
-                      <X className="w-4 h-4" />
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeAttendee(index)}>
+                      <X className="w-4 h-4 text-destructive" />
                     </Button>
                   )}
                 </div>
@@ -408,36 +350,33 @@ export default function MeetingForm() {
           <div className="space-y-2">
             <Label>الشواهد والمرفقات</Label>
             {entityId ? (
-              <FileUploadZone entityType="meeting" entityId={entityId} />
+              <FileUploadZone
+                entityType="meeting"
+                entityId={entityId}
+              />
             ) : (
-              <p className="text-sm text-muted-foreground">احفظ المحضر أولاً لإضافة المرفقات</p>
+              <p className="text-sm text-muted-foreground border border-dashed rounded-lg p-4 text-center">
+                احفظ المحضر أولاً لإضافة المرفقات
+              </p>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Actions */}
-      <div className="flex gap-3 justify-end">
-        <Button variant="outline" onClick={() => setLocation("/dashboard")}>
-          إلغاء
-        </Button>
-        <Button
-          onClick={() => handleSave("draft")}
-          disabled={isPending}
-          variant="outline"
-        >
-          {isPending && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
-          حفظ كمسودة
-        </Button>
-        <Button
-          onClick={() => handleSave("final")}
-          disabled={isPending}
-        >
-          {isPending && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
-          <Save className="w-4 h-4 ml-2" />
+      {/* Action Buttons */}
+      <div className="flex gap-3 justify-start">
+        <Button onClick={() => handleSave("final")} disabled={isPending} className="gap-2">
+          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
           حفظ واعتماد
         </Button>
+        <Button variant="outline" onClick={() => handleSave("draft")} disabled={isPending}>
+          حفظ كمسودة
+        </Button>
+        <Button variant="ghost" onClick={() => setLocation("/dashboard")}>
+          إلغاء
+        </Button>
       </div>
+
       {/* PDF Preview Modal */}
       {entityId && (
         <PdfPreviewModal
@@ -445,7 +384,7 @@ export default function MeetingForm() {
           onClose={() => setPreviewOpen(false)}
           pdfUrl={`/api/pdf/meeting/${entityId}`}
           fileName={`محضر_اجتماع_${hijriDate.replace(/\//g, "-")}.pdf`}
-          title={`معاينة: ${title || "محضر الاجتماع"}`}
+          title={`معاينة: ${title}`}
         />
       )}
     </div>
