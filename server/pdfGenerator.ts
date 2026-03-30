@@ -1,20 +1,16 @@
 /**
- * خدمة توليد PDF باستخدام Puppeteer (Chrome مضمّن)
- * يدعم العربية وRTL بشكل كامل عبر HTML/CSS
- * يعمل في بيئة Development وProduction
+ * خدمة توليد PDF احترافية
+ * تستخدم puppeteer-core و @sparticuz/chromium للعمل في بيئات Production (Vercel, Render, Railway)
+ * تدعم اللغة العربية و RTL بشكل كامل
  */
-import puppeteer from "puppeteer";
-import path from "path";
-import { fileURLToPath } from "url";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 
-// للحصول على مسار المجلد الحالي في ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// إنشاء browser مشترك (singleton)
-let browserInstance: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+// إنشاء browser مشترك (singleton) لتقليل استهلاك الذاكرة
+let browserInstance: any = null;
 
 async function getBrowser() {
+  // إذا كان هناك نسخة تعمل مسبقاً، اختبرها وأعد استخدامها
   if (browserInstance) {
     try {
       await browserInstance.version();
@@ -24,32 +20,24 @@ async function getBrowser() {
     }
   }
 
-  // ملاحظة: تركنا executablePath فارغاً ليعتمد Puppeteer على الإعدادات
-  // المحددة في ملف .puppeteerrc.cjs أو متغيرات البيئة.
-  // تم إضافة userDataDir لضمان وجود مسار بيانات مستقل داخل المشروع.
+  // إعدادات التشغيل الخاصة بالبيئات السحابية (تتجاوز قيود المسارات والصلاحيات)
   browserInstance = await puppeteer.launch({
-    headless: true,
-    userDataDir: path.join(__dirname, "../../.puppeteer_data"),
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--no-first-run",
-      "--no-zygote",
-      "--single-process",
-    ],
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
+
   return browserInstance;
 }
 
-// ألوان الشركتين
+// ألوان الهوية البصرية للشركات
 const COMPANY_COLORS = {
   quraish: { primary: "#1a4a8a", accent: "#e6981a", name: "شركة قريش المحدودة" },
   azan:    { primary: "#1a5c3a", accent: "#c8a820", name: "شركة أذان المحدودة" },
 };
 
-// خريطة الإدارات
+// خريطة أسماء الإدارات بالعربية
 const DEPT_MAP: Record<string, string> = {
   technology:  "إدارة التقنية",
   catering:    "إدارة الإعاشة",
@@ -59,7 +47,7 @@ const DEPT_MAP: Record<string, string> = {
   supervisors: "إدارة المشرفين",
 };
 
-// CSS المشترك لجميع ملفات PDF
+// تصميم CSS الموحد لملفات PDF
 function getBaseCSS(primary: string, accent: string): string {
   return `
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -110,7 +98,6 @@ function getBaseCSS(primary: string, accent: string): string {
       border-radius: 3px;
     }
     .header-right { text-align: right; flex: 1; }
-    .header-left  { text-align: left; font-size: 11px; opacity: 0.85; }
     .company-name { font-size: 20px; font-weight: 700; margin-bottom: 3px; }
     .doc-type     { font-size: 12px; opacity: 0.85; }
     .accent-bar   { height: 5px; background: ${accent}; }
@@ -182,8 +169,6 @@ function getBaseCSS(primary: string, accent: string): string {
       padding: 10px 14px;
       border-bottom: 1px solid #eef1f8;
     }
-    .data-row:last-child { border-bottom: none; }
-    .data-row:nth-child(even) { background: #f7f9fd; }
     .data-label { font-size: 10px; color: #888; font-weight: 600; }
     .data-value { font-size: 12px; font-weight: 600; color: #222; max-width: 70%; text-align: right; }
     .score-box {
@@ -225,7 +210,7 @@ function getBaseCSS(primary: string, accent: string): string {
   `;
 }
 
-// ===== توليد PDF المحضر =====
+// ===== توليد PDF المحضر الاجتماع =====
 export async function generateMeetingPdf(data: {
   id: number;
   title: string;
@@ -262,63 +247,38 @@ export async function generateMeetingPdf(data: {
       <div class="company-name">${colors.name}</div>
       <div class="doc-type">محضر اجتماع</div>
     </div>
-    <div class="header-left">
-    </div>
   </div>
   <div class="accent-bar"></div>
-
   <div class="info-bar">
     <span>${data.dayOfWeek}  |  ${data.hijriDate}</span>
     ${deptLabel ? `<span>${deptLabel}</span>` : ""}
   </div>
-
   <div class="content">
     <div class="meeting-title">${data.title || "—"}</div>
-
     ${elements.length > 0 ? `
     <div class="section">
       <div class="section-header">عناصر الاجتماع</div>
       <div class="section-body">
-        ${elements.map((item, i) => `
-          <div class="row">
-            <span class="row-num">${i + 1}</span>
-            <span class="row-text">${item}</span>
-          </div>`).join("")}
+        ${elements.map((item, i) => `<div class="row"><span class="row-num">${i + 1}</span><span class="row-text">${item}</span></div>`).join("")}
       </div>
     </div>` : ""}
-
     ${recs.length > 0 ? `
     <div class="section">
       <div class="section-header">التوصيات</div>
       <div class="section-body">
-        ${recs.map((rec, i) => `
-          <div class="row">
-            <span class="row-num">${i + 1}</span>
-            <span class="row-text">${rec}</span>
-          </div>`).join("")}
+        ${recs.map((rec, i) => `<div class="row"><span class="row-num">${i + 1}</span><span class="row-text">${rec}</span></div>`).join("")}
       </div>
     </div>` : ""}
-
     ${attendees.length > 0 ? `
     <div class="section">
       <div class="section-header">الحضور</div>
-      <div class="section-body">
-        <div class="attendees-grid">
-          ${attendees.map(att => `<div class="attendee-cell">${att}</div>`).join("")}
-        </div>
-      </div>
+      <div class="section-body"><div class="attendees-grid">${attendees.map(att => `<div class="attendee-cell">${att}</div>`).join("")}</div></div>
     </div>` : ""}
-
     ${data.createdByName ? `
     <div class="signature-area">
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-name">${data.createdByName}</div>
-        <div class="signature-role">المُعِد</div>
-      </div>
+      <div class="signature-block"><div class="signature-line"></div><div class="signature-name">${data.createdByName}</div><div class="signature-role">المُعِد</div></div>
     </div>` : ""}
   </div>
-
   <div class="footer">
     <span>${colors.name}  |  نظام التوثيق</span>
     <span>${new Date().toLocaleDateString("ar-SA")}</span>
@@ -365,72 +325,28 @@ export async function generateEvaluationPdf(data: {
       <div class="company-name">${colors.name}</div>
       <div class="doc-type">تقرير تقييم الأداء</div>
     </div>
-    <div class="header-left">
-    </div>
   </div>
   <div class="accent-bar"></div>
-
-  <div class="info-bar">
-    <span>${data.dayOfWeek}  |  ${data.hijriDate}</span>
-  </div>
-
+  <div class="info-bar"><span>${data.dayOfWeek}  |  ${data.hijriDate}</span></div>
   <div class="content">
     <div class="section">
       <div class="section-header">بيانات التقييم</div>
       <div class="section-body">
-        <div class="data-row">
-          <span class="data-label">المحور</span>
-          <span class="data-value">${data.axis || "—"}</span>
-        </div>
-        <div class="data-row">
-          <span class="data-label">المسار</span>
-          <span class="data-value">${data.track || "—"}</span>
-        </div>
-        <div class="data-row">
-          <span class="data-label">المعيار</span>
-          <span class="data-value">${data.criterion || "—"}</span>
-        </div>
+        <div class="data-row"><span class="data-label">المحور</span><span class="data-value">${data.axis || "—"}</span></div>
+        <div class="data-row"><span class="data-label">المسار</span><span class="data-value">${data.track || "—"}</span></div>
+        <div class="data-row"><span class="data-label">المعيار</span><span class="data-value">${data.criterion || "—"}</span></div>
       </div>
     </div>
-
     <div class="score-box">
-      <div>
-        <div class="score-label">الدرجة المحققة</div>
-        <div class="score-number" style="color:${scoreColor}">${data.score}</div>
-        <div style="font-size:11px;color:#888">من 100</div>
-      </div>
-      <div class="score-info">
-        <div style="font-size:12px;font-weight:600;color:${scoreColor}">
-          ${data.score >= 70 ? "ممتاز" : data.score >= 50 ? "جيد" : "يحتاج تحسين"}
-        </div>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width:${progressPct}%;background:${scoreColor}"></div>
-        </div>
+      <div><div class="score-label">الدرجة المحققة</div><div class="score-number" style="color:${scoreColor}">${data.score}</div><div style="font-size:11px;color:#888">من 100</div></div>
+      <div class="score-info"><div style="font-size:12px;font-weight:600;color:${scoreColor}">${data.score >= 70 ? "ممتاز" : data.score >= 50 ? "جيد" : "يحتاج تحسين"}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${progressPct}%;background:${scoreColor}"></div></div>
       </div>
     </div>
-
-    ${data.notes ? `
-    <div class="section">
-      <div class="section-header">الملاحظات</div>
-      <div class="section-body">
-        <div style="padding:12px 14px;font-size:12px;line-height:1.8">${data.notes.replace(/\n/g, "<br>")}</div>
-      </div>
-    </div>` : ""}
-
-    ${data.createdByName ? `
-    <div class="signature-area">
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-name">${data.createdByName}</div>
-        <div class="signature-role">المُعِد</div>
-      </div>
-    </div>` : ""}
+    ${data.notes ? `<div class="section"><div class="section-header">الملاحظات</div><div class="section-body"><div style="padding:12px 14px;font-size:12px;line-height:1.8">${data.notes.replace(/\n/g, "<br>")}</div></div></div>` : ""}
+    ${data.createdByName ? `<div class="signature-area"><div class="signature-block"><div class="signature-line"></div><div class="signature-name">${data.createdByName}</div><div class="signature-role">المُعِد</div></div></div>` : ""}
   </div>
-
-  <div class="footer">
-    <span>${colors.name}  |  نظام التوثيق</span>
-    <span>${new Date().toLocaleDateString("ar-SA")}</span>
-  </div>
+  <div class="footer"><span>${colors.name}  |  نظام التوثيق</span><span>${new Date().toLocaleDateString("ar-SA")}</span></div>
 </div>
 </body>
 </html>`;
@@ -438,17 +354,20 @@ export async function generateEvaluationPdf(data: {
   return renderHtmlToPdf(html);
 }
 
-// ===== دالة التوليد المشتركة =====
+// ===== دالة التحويل من HTML إلى PDF =====
 async function renderHtmlToPdf(html: string): Promise<Buffer> {
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 30000 });
+    // تحميل المحتوى مع انتظار استقرار الـ DOM
+    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
+    
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: "0", right: "0", bottom: "0", left: "0" },
     });
+    
     return Buffer.from(pdfBuffer);
   } finally {
     await page.close();
