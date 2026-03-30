@@ -72,9 +72,37 @@ function getBaseCSS(primary: string, accent: string): string {
       padding: 18px 28px 14px;
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
     }
-    .header-right { text-align: right; }
+    .header-logo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      min-width: 80px;
+    }
+    .logo-image {
+      width: 50px;
+      height: 50px;
+      background: white;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: ${primary};
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+    .logo-number {
+      font-size: 10px;
+      font-weight: 600;
+      color: white;
+      background: rgba(0,0,0,0.2);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .header-right { text-align: right; flex: 1; }
     .header-left  { text-align: left; font-size: 11px; opacity: 0.85; }
     .company-name { font-size: 20px; font-weight: 700; margin-bottom: 3px; }
     .doc-type     { font-size: 12px; opacity: 0.85; }
@@ -219,12 +247,15 @@ export async function generateMeetingPdf(data: {
 <body>
 <div class="page">
   <div class="header">
+    <div class="header-logo">
+      <div class="logo-image">ق</div>
+      <div class="logo-number">${data.meetingNumber || "1447/0001"}</div>
+    </div>
     <div class="header-right">
       <div class="company-name">${colors.name}</div>
       <div class="doc-type">محضر اجتماع</div>
     </div>
     <div class="header-left">
-      ${data.meetingNumber ? `<div>رقم: ${data.meetingNumber}</div>` : ""}
     </div>
   </div>
   <div class="accent-bar"></div>
@@ -319,12 +350,15 @@ export async function generateEvaluationPdf(data: {
 <body>
 <div class="page">
   <div class="header">
+    <div class="header-logo">
+      <div class="logo-image">ق</div>
+      <div class="logo-number">${data.reportNumber || "1447/0001"}</div>
+    </div>
     <div class="header-right">
       <div class="company-name">${colors.name}</div>
       <div class="doc-type">تقرير تقييم الأداء</div>
     </div>
     <div class="header-left">
-      <div>رقم: ${data.reportNumber}</div>
     </div>
   </div>
   <div class="accent-bar"></div>
