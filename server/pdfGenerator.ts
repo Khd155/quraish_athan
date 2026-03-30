@@ -5,9 +5,6 @@
  */
 import puppeteer from "puppeteer";
 
-// مسار Chrome - يستخدم المضمّن في puppeteer تلقائياً
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || puppeteer.executablePath();
-
 // إنشاء browser مشترك (singleton)
 let browserInstance: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
 
@@ -20,8 +17,10 @@ async function getBrowser() {
       browserInstance = null;
     }
   }
+
+  // ملاحظة: تركنا executablePath فارغاً ليعتمد Puppeteer على المسار 
+  // المحدد في ملف .puppeteerrc.cjs المحمل داخل مجلد المشروع.
   browserInstance = await puppeteer.launch({
-    executablePath: CHROMIUM_PATH,
     headless: true,
     args: [
       "--no-sandbox",
