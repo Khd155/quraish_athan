@@ -90,3 +90,9 @@
 - [x] حذف حقل التاريخ الميلادي من نموذج المحضر
 - [x] بناء Hijri Date Picker (اختيار السنة/الشهر/اليوم من قوائم منسدلة)
 - [x] تحديث نموذج المحضر ليستخدم Hijri Date Picker فقط
+
+## إصلاح Chrome/Chromium في Production (مارس 2026 - الجولة 4)
+- [x] تثبيت Chrome عبر npm script في package.json
+- [x] إعداد متغير PUPPETEER_CACHE_DIR في بيئة Production
+- [x] تحديث pdfGenerator لاستخدام مسار Chrome الصحيح مع fallback آمن
+- [x] اختبار PDF في Production بعد النشر
