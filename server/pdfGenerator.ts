@@ -1,42 +1,27 @@
 /**
- * خدمة توليد PDF باستخدام Puppeteer (الإصدار المطور)
+ * خدمة توليد PDF باستخدام Puppeteer (Chrome مضمّن)
  * يدعم العربية وRTL بشكل كامل عبر HTML/CSS
- * تم التعديل لحل مشكلة مسار الكروم (executablePath) تلقائياً
+ * يعمل في بيئة Development وProduction
  */
 import puppeteer from "puppeteer";
 
-/**
- * دالة ذكية لتحديد مسار المتصفح
- * تحاول البحث في متغيرات البيئة أولاً، ثم المسارات الشائعة في نظام لینوكس
- */
-const getExecutablePath = () => {
-  // 1. التحقق من متغيرات البيئة المخصصة (إذا كانت معرفة)
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
-  if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
+// مسار Chrome - يستخدم المضمّن في puppeteer تلقائياً
+const CHROMIUM_PATH = process.env.CHROMIUM_PATH || puppeteer.executablePath();
 
-  // 2. إذا لم توجد، نترك Puppeteer يحاول التشغيل تلقائياً من المسار الافتراضي
-  // ملاحظة: إذا كنت على Replit، يفضل تنفيذ: npx puppeteer browsers install chrome
-  return undefined; 
-};
-
-// إنشاء browser مشترك (singleton) لضمان كفاءة الأداء
-let browserInstance: any = null;
+// إنشاء browser مشترك (singleton)
+let browserInstance: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
 
 async function getBrowser() {
   if (browserInstance) {
     try {
-      // التحقق مما إذا كان المتصفح لا يزال يعمل
       await browserInstance.version();
       return browserInstance;
     } catch {
-      // إذا تعطل المتصفح، نقوم بإعادة تعيينه
       browserInstance = null;
     }
   }
-
-  // تشغيل المتصفح بإعدادات متوافقة مع الخوادم (No Sandbox)
   browserInstance = await puppeteer.launch({
-    executablePath: getExecutablePath(),
+    executablePath: CHROMIUM_PATH,
     headless: true,
     args: [
       "--no-sandbox",
@@ -51,13 +36,13 @@ async function getBrowser() {
   return browserInstance;
 }
 
-// ألوان وهويات الشركات
+// ألوان الشركتين
 const COMPANY_COLORS = {
   quraish: { primary: "#1a4a8a", accent: "#e6981a", name: "شركة قريش المحدودة" },
   azan:    { primary: "#1a5c3a", accent: "#c8a820", name: "شركة أذان المحدودة" },
 };
 
-// خريطة الإدارات للمحاضر
+// خريطة الإدارات
 const DEPT_MAP: Record<string, string> = {
   technology:  "إدارة التقنية",
   catering:    "إدارة الإعاشة",
@@ -67,7 +52,7 @@ const DEPT_MAP: Record<string, string> = {
   supervisors: "إدارة المشرفين",
 };
 
-// CSS الأساسي لتنسيق الملفات باللغة العربية
+// CSS المشترك لجميع ملفات PDF
 function getBaseCSS(primary: string, accent: string): string {
   return `
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -206,12 +191,24 @@ function getBaseCSS(primary: string, accent: string): string {
 }
 
 // ===== توليد PDF المحضر =====
-export async function generateMeetingPdf(data: any): Promise<Buffer> {
+export async function generateMeetingPdf(data: {
+  id: number;
+  title: string;
+  hijriDate: string;
+  dayOfWeek: string;
+  elements: string;
+  recommendations: string;
+  attendees: string[];
+  company: string;
+  department?: string;
+  meetingNumber?: string;
+  createdByName?: string;
+}): Promise<Buffer> {
   const colors = COMPANY_COLORS[data.company as keyof typeof COMPANY_COLORS] || COMPANY_COLORS.quraish;
   const deptLabel = data.department ? (DEPT_MAP[data.department] || data.department) : "";
-  const elements = (data.elements || "").split("\n").filter((e: string) => e.trim());
-  const recs = (data.recommendations || "").split("\n").filter((r: string) => r.trim());
-  const attendees = (data.attendees || []).filter((a: string) => a.trim());
+  const elements = (data.elements || "").split("\n").filter(e => e.trim());
+  const recs = (data.recommendations || "").split("\n").filter(r => r.trim());
+  const attendees = (data.attendees || []).filter(a => a.trim());
 
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -244,7 +241,7 @@ export async function generateMeetingPdf(data: any): Promise<Buffer> {
     <div class="section">
       <div class="section-header">عناصر الاجتماع</div>
       <div class="section-body">
-        ${elements.map((item: string, i: number) => `
+        ${elements.map((item, i) => `
           <div class="row">
             <span class="row-num">${i + 1}</span>
             <span class="row-text">${item}</span>
@@ -256,7 +253,7 @@ export async function generateMeetingPdf(data: any): Promise<Buffer> {
     <div class="section">
       <div class="section-header">التوصيات</div>
       <div class="section-body">
-        ${recs.map((rec: string, i: number) => `
+        ${recs.map((rec, i) => `
           <div class="row">
             <span class="row-num">${i + 1}</span>
             <span class="row-text">${rec}</span>
@@ -269,7 +266,7 @@ export async function generateMeetingPdf(data: any): Promise<Buffer> {
       <div class="section-header">الحضور</div>
       <div class="section-body">
         <div class="attendees-grid">
-          ${attendees.map((att: string) => `<div class="attendee-cell">${att}</div>`).join("")}
+          ${attendees.map(att => `<div class="attendee-cell">${att}</div>`).join("")}
         </div>
       </div>
     </div>` : ""}
@@ -295,8 +292,20 @@ export async function generateMeetingPdf(data: any): Promise<Buffer> {
   return renderHtmlToPdf(html);
 }
 
-// ===== توليد PDF تقرير التقيية =====
-export async function generateEvaluationPdf(data: any): Promise<Buffer> {
+// ===== توليد PDF تقرير التقييم =====
+export async function generateEvaluationPdf(data: {
+  id: number;
+  reportNumber: string;
+  company: string;
+  hijriDate: string;
+  dayOfWeek: string;
+  axis: string;
+  track: string;
+  criterion: string;
+  score: number;
+  notes: string;
+  createdByName?: string;
+}): Promise<Buffer> {
   const colors = COMPANY_COLORS[data.company as keyof typeof COMPANY_COLORS] || COMPANY_COLORS.quraish;
   const scoreColor = data.score >= 70 ? "#1a9e3a" : data.score >= 50 ? "#e6981a" : "#d32f2f";
   const progressPct = Math.min(100, Math.max(0, data.score));
@@ -388,7 +397,7 @@ export async function generateEvaluationPdf(data: any): Promise<Buffer> {
   return renderHtmlToPdf(html);
 }
 
-// ===== دالة التوليد المشتركة (تنسيق HTML إلى PDF) =====
+// ===== دالة التوليد المشتركة =====
 async function renderHtmlToPdf(html: string): Promise<Buffer> {
   const browser = await getBrowser();
   const page = await browser.newPage();
