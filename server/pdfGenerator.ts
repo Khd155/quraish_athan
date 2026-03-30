@@ -4,6 +4,12 @@
  * يعمل في بيئة Development وProduction
  */
 import puppeteer from "puppeteer";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// للحصول على مسار المجلد الحالي في ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // إنشاء browser مشترك (singleton)
 let browserInstance: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
@@ -18,10 +24,12 @@ async function getBrowser() {
     }
   }
 
-  // ملاحظة: تركنا executablePath فارغاً ليعتمد Puppeteer على المسار 
-  // المحدد في ملف .puppeteerrc.cjs المحمل داخل مجلد المشروع.
+  // ملاحظة: تركنا executablePath فارغاً ليعتمد Puppeteer على الإعدادات
+  // المحددة في ملف .puppeteerrc.cjs أو متغيرات البيئة.
+  // تم إضافة userDataDir لضمان وجود مسار بيانات مستقل داخل المشروع.
   browserInstance = await puppeteer.launch({
     headless: true,
+    userDataDir: path.join(__dirname, "../../.puppeteer_data"),
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
