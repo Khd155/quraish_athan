@@ -96,3 +96,10 @@
 - [x] إعداد متغير PUPPETEER_CACHE_DIR في بيئة Production
 - [x] تحديث pdfGenerator لاستخدام مسار Chrome الصحيح مع fallback آمن
 - [x] اختبار PDF في Production بعد النشر
+
+## إصلاح المشاكل الخمس الحرجة (مارس 2026 - الجولة 5)
+- [x] التحقق من مسارات Express REST: GET /api/pdf/meeting/:id و GET /api/pdf/evaluation/:id (موجودة بالفعل)
+- [x] إصلاح حلقة التكرار في PdfPreviewModal (إضافة timeout و retry limit)
+- [x] إضافة caching لتقليل عبء توليد PDF المتكرر (5 دقائق TTL)
+- [x] تحديث بيانات التقييم (evaluationData.ts موجودة وكاملة)
+- [ ] اختبار شامل لجميع المسارات والمعاينات

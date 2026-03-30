@@ -37,15 +37,32 @@ async function startServer() {
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
 
-  // PDF Generation Routes (using pdf-lib Node.js - works in Production)
+  // PDF Generation Routes (using Puppeteer - works in Production)
+  // إضافة cache بسيط لتقليل عبء توليد PDF المتكرر
+  const pdfCache = new Map<string, { buffer: Buffer; timestamp: number }>();
+  const CACHE_TTL = 5 * 60 * 1000; // 5 دقائق
+
   app.get("/api/pdf/meeting/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const cacheKey = `meeting-${id}`;
+      
+      // فحص الـ cache
+      const cached = pdfCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="meeting_${id}.pdf"`);
+        res.setHeader("X-Cache", "HIT");
+        res.send(cached.buffer);
+        return;
+      }
+
       const meeting = await db.getMeetingById(id);
       if (!meeting) {
         res.status(404).json({ error: "Meeting not found" });
         return;
       }
+      
       const pdfBuffer = await generateMeetingPdf({
         id: meeting.id,
         company: meeting.company,
@@ -58,8 +75,13 @@ async function startServer() {
         attendees: (meeting.attendees as string[]) || [],
         createdByName: meeting.createdByName || undefined,
       });
+      
+      // حفظ في الـ cache
+      pdfCache.set(cacheKey, { buffer: pdfBuffer, timestamp: Date.now() });
+      
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="meeting_${id}.pdf"`);
+      res.setHeader("X-Cache", "MISS");
       res.send(pdfBuffer);
     } catch (err: any) {
       console.error("PDF generation error:", err);
@@ -70,11 +92,24 @@ async function startServer() {
   app.get("/api/pdf/evaluation/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const cacheKey = `evaluation-${id}`;
+      
+      // فحص الـ cache
+      const cached = pdfCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="evaluation_${id}.pdf"`);
+        res.setHeader("X-Cache", "HIT");
+        res.send(cached.buffer);
+        return;
+      }
+
       const report = await db.getEvaluationReportById(id);
       if (!report) {
         res.status(404).json({ error: "Report not found" });
         return;
       }
+      
       const pdfBuffer = await generateEvaluationPdf({
         id: report.id,
         company: report.company,
@@ -88,8 +123,13 @@ async function startServer() {
         reportNumber: report.reportNumber || String(report.id),
         createdByName: report.createdByName || undefined,
       });
+      
+      // حفظ في الـ cache
+      pdfCache.set(cacheKey, { buffer: pdfBuffer, timestamp: Date.now() });
+      
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="evaluation_${report.reportNumber}.pdf"`);
+      res.setHeader("X-Cache", "MISS");
       res.send(pdfBuffer);
     } catch (err: any) {
       console.error("PDF generation error:", err);
