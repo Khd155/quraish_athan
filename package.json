@@ -5,8 +5,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "pnpm install-chrome && vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "install-chrome": "node -e \"import puppeteer from 'puppeteer'; await puppeteer.launch({headless: true}).then(b => b.close()).catch(e => console.error('Chrome setup:', e));\"",
+    "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "postinstall": "npx puppeteer browsers install chrome",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
