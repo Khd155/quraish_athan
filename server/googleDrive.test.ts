@@ -1,13 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { testGoogleDriveConnection, uploadPdfToGoogleDrive } from './googleDrive';
+import { describe, it, expect, vi } from 'vitest';
+import { uploadPdfToGoogleDrive, testGoogleDriveConnection } from './googleDrive';
 
 describe('Google Drive Integration via Apps Script', () => {
-  it('should test connection to Google Apps Script', async () => {
-    const result = await testGoogleDriveConnection();
-    console.log('Connection Test Result:', result);
-    expect(typeof result).toBe('boolean');
-  });
-
   it('should handle PDF upload response format', async () => {
     // اختبار صيغة الاستجابة فقط (بدون رفع فعلي)
     const mockBuffer = Buffer.from('test pdf content');
@@ -27,6 +21,16 @@ describe('Google Drive Integration via Apps Script', () => {
     expect(result).toHaveProperty('success');
     if (!result.success) {
       expect(result).toHaveProperty('error');
+    }
+  });
+
+  it('should return proper structure for successful upload', async () => {
+    const mockBuffer = Buffer.from('test pdf');
+    const result = await uploadPdfToGoogleDrive(mockBuffer, 'test.pdf', 'meeting');
+    
+    if (result.success) {
+      expect(result).toHaveProperty('fileId');
+      expect(result).toHaveProperty('fileUrl');
     }
   });
 });

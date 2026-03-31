@@ -97,30 +97,12 @@
 - [x] تحديث pdfGenerator لاستخدام مسار Chrome الصحيح مع fallback آمن
 - [x] اختبار PDF في Production بعد النشر
 
-## ربط Google Drive لرفع PDF تلقائي (مارس 2026)
-- [x] حفظ Service Account JSON وإعداد متغيرات البيئة
-- [x] بناء خدمة Google Drive في Node.js (googleDrive.ts)
-- [x] تعديل pdfGenerator لرفع PDF تلقائياً بعد الإنشاء
-- [ ] اختبار الرفع التلقائي والتحقق من الملفات في Google Drive
 
-
-## تطبيق OAuth 2.0 للرفع التلقائي (مارس 2026 - الجولة 2)
-- [x] تحويل من Service Account إلى OAuth 2.0 Flow
-- [x] إضافة بيانات OAuth 2.0 (Client ID + Secret)
-- [x] بناء googleDrive.ts باستخدام OAuth2Client
-- [x] حفظ tokens محلياً للاستخدام المتكرر
-- [x] إضافة مسارات OAuth في routers.ts (getAuthUrl, handleCallback, testConnection)
-- [x] تحديث اختبارات Google Drive
-- [ ] اختبار OAuth Flow كاملاً والتحقق من الرفع التلقائي
-- [ ] إنشاء واجهة مصادقة OAuth في الواجهة الأمامية
-
-
-## تطبيق Google Apps Script للرفع التلقائي (مارس 2026 - الجولة 3)
-- [x] تحويل من OAuth 2.0 إلى Google Apps Script كوسيط
-- [x] بناء googleDrive.ts باستخدام axios و Google Apps Script
-- [x] دالة uploadPdfToGoogleDrive ترسل Base64 إلى Apps Script
-- [x] دالة uploadPdfDirectly للاستدعاء التلقائي من pdfGenerator
-- [x] ربط الرفع التلقائي مع generateMeetingPdf و generateEvaluationPdf
-- [x] تحديث اختبارات Google Drive
-- [ ] اختبار الرفع التلقائي الكامل والتحقق من الملفات في Google Drive
-- [ ] إضافة رسائل نجاح/فشل في الواجهة الأمامية
+## إضافة زر "تصدير إلى Google Drive" (مارس 2026 - الجولة 4)
+- [ ] إضافة إجراء tRPC جديد للرفع عند الطلب (exportToGoogleDrive)
+- [ ] إضافة زر في صفحة تفاصيل المحضر بجانب زر الحفظ
+- [ ] إضافة زر في صفحة تفاصيل التقرير بجانب زر الحفظ
+- [ ] إضافة زر في قائمة المحاضر بجانب كل عنصر
+- [ ] إضافة زر في قائمة التقارير بجانب كل عنصر
+- [ ] إضافة toast notifications لرسائل النجاح/الفشل
+- [ ] اختبار الرفع من الأزرار والتحقق من الملفات في Google Drive

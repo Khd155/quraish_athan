@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { DAYS_OF_WEEK, getDayFromHijriDate, formatHijriDate, gregorianToHijri, getDayOfWeek } from "@shared/hijriUtils";
-import { ArrowRight, Loader2, Plus, X, FileDown, Eye } from "lucide-react";
+import { ArrowRight, Loader2, Plus, X, FileDown, Eye, Cloud } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
@@ -140,6 +140,22 @@ export default function MeetingForm() {
     }
   };
 
+  // Export to Google Drive
+  const exportMutation = trpc.googleDrive.exportMeeting.useMutation({
+    onSuccess: (data) => {
+      toast.success(`تم التصدير بنجاح إلى Google Drive`);
+    },
+    onError: (err) => toast.error(`فشل التصدير: ${err.message}`),
+  });
+
+  const handleExportToDrive = async () => {
+    if (!entityId) {
+      toast.error("يرجى حفظ المحضر أولاً");
+      return;
+    }
+    exportMutation.mutate({ id: entityId });
+  };
+
   // Elements handlers
   const addElement = () => setElements([...elements, ""]);
   const removeElement = (index: number) => {
@@ -202,6 +218,10 @@ export default function MeetingForm() {
             <Button variant="outline" onClick={handleExportPDF} disabled={generating} className="gap-2">
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
               تنزيل PDF
+            </Button>
+            <Button variant="outline" onClick={handleExportToDrive} disabled={exportMutation.isPending} className="gap-2">
+              {exportMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+              تصدير للـ Drive
             </Button>
           </div>
         )}

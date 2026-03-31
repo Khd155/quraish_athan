@@ -9,7 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { trpc } from "@/lib/trpc";
 import { evaluationAxes, getTracksByAxis, getCriteriaByTrack } from "@shared/evaluationData";
 import { DAYS_OF_WEEK, gregorianToHijri, formatHijriDate, getDayOfWeek, getDayFromHijriDate } from "@shared/hijriUtils";
-import { ArrowRight, Loader2, Save, FileDown, Eye } from "lucide-react";
+import { ArrowRight, Loader2, Save, FileDown, Eye, Cloud } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
@@ -213,6 +213,22 @@ export default function EvaluationForm() {
     }
   };
 
+  // Export to Google Drive
+  const exportMutation = trpc.googleDrive.exportEvaluation.useMutation({
+    onSuccess: (data) => {
+      toast.success(`تم التصدير بنجاح إلى Google Drive`);
+    },
+    onError: (err) => toast.error(`فشل التصدير: ${err.message}`),
+  });
+
+  const handleExportToDrive = async () => {
+    if (!entityId) {
+      toast.error("يرجى حفظ التقرير أولاً");
+      return;
+    }
+    exportMutation.mutate({ id: entityId });
+  };
+
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   // عرض اسم المحور/المسار/المعيار الحالي
@@ -243,6 +259,10 @@ export default function EvaluationForm() {
             <Button variant="outline" onClick={handleExportPDF} disabled={generating} className="gap-2">
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
               تنزيل PDF
+            </Button>
+            <Button variant="outline" onClick={handleExportToDrive} disabled={exportMutation.isPending} className="gap-2">
+              {exportMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+              تصدير للـ Drive
             </Button>
           </div>
         )}

@@ -9,7 +9,8 @@ import { ONE_YEAR_MS } from "@shared/const";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { TRPCError } from "@trpc/server";
-
+import { uploadPdfToGoogleDrive } from "./googleDrive";
+import { generateMeetingPdf, generateEvaluationPdf } from "./pdfGenerator";
 
 export const appRouter = router({
   system: systemRouter,
@@ -271,6 +272,83 @@ export const appRouter = router({
     overview: adminProcedure.query(async () => {
       return db.getStats();
     }),
+  }),
+
+  // ============ تصدير إلى Google Drive ============
+  googleDrive: router({
+    exportMeeting: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        try {
+          const meeting = await db.getMeetingById(input.id);
+          if (!meeting) throw new TRPCError({ code: "NOT_FOUND", message: "المحضر غير موجود" });
+
+          // توليد PDF
+          const pdfBuffer = await generateMeetingPdf({
+            id: meeting.id,
+            title: meeting.title,
+            hijriDate: meeting.hijriDate,
+            dayOfWeek: meeting.dayOfWeek,
+            elements: meeting.elements || "",
+            recommendations: meeting.recommendations || "",
+            attendees: (meeting.attendees as string[]) || [],
+            company: meeting.company,
+            department: meeting.department || undefined,
+            meetingNumber: `1447/${String(meeting.id).padStart(4, "0")}`,
+            createdByName: meeting.createdByName || "",
+          });
+
+          // رفع إلى Google Drive
+          const fileName = `محضر_${meeting.hijriDate}_${meeting.title?.slice(0, 20) || "بدون_عنوان"}.pdf`;
+          const result = await uploadPdfToGoogleDrive(pdfBuffer, fileName, "meeting");
+
+          if (result.success) {
+            return { success: true, fileId: result.fileId, fileUrl: result.fileUrl };
+          } else {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error });
+          }
+        } catch (error: any) {
+          console.error("خطأ في تصدير المحضر:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message || "فشل التصدير" });
+        }
+      }),
+
+    exportEvaluation: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        try {
+          const report = await db.getEvaluationReportById(input.id);
+          if (!report) throw new TRPCError({ code: "NOT_FOUND", message: "التقرير غير موجود" });
+
+          // توليد PDF
+          const pdfBuffer = await generateEvaluationPdf({
+            id: report.id,
+            reportNumber: report.reportNumber,
+            company: report.company,
+            hijriDate: report.hijriDate,
+            dayOfWeek: report.dayOfWeek,
+            axis: report.axis,
+            track: report.track,
+            criterion: report.criterion,
+            score: report.score || 0,
+            notes: report.notes || "",
+            createdByName: report.createdByName || "",
+          });
+
+          // رفع إلى Google Drive
+          const fileName = `تقرير_${report.reportNumber}_${report.axis?.slice(0, 15) || "بدون_محور"}.pdf`;
+          const result = await uploadPdfToGoogleDrive(pdfBuffer, fileName, "evaluation");
+
+          if (result.success) {
+            return { success: true, fileId: result.fileId, fileUrl: result.fileUrl };
+          } else {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error });
+          }
+        } catch (error: any) {
+          console.error("خطأ في تصدير التقرير:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message || "فشل التصدير" });
+        }
+      }),
   }),
 });
 
