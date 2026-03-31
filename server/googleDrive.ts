@@ -1,270 +1,122 @@
-import { google } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
-import * as fs from 'fs';
-import * as path from 'path';
-import { Readable } from 'stream';
-import { fileURLToPath } from 'url';
+import axios from 'axios';
 
-// الحصول على المسار الحالي في ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// بيانات OAuth 2.0
-const OAUTH_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
-const OAUTH_CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
-const OAUTH_REDIRECT_URL = 'http://localhost:3000/api/oauth/google-drive-callback';
-
-// مسار حفظ tokens
-const TOKENS_PATH = path.join(__dirname, 'google-drive-tokens.json');
+// رابط Google Apps Script الذي تم إعداده مسبقاً
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzo-Q_KO2E3E2DF6WD9_Q9FLELAbZqkVMTcmIIZ0vb_7JV1NM_0FvT8E9duVAUIMpt/exec';
 
 // Folder ID في Google Drive
 const DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || '1Ev7FIi0Z7InXg-EHh8KHAuDm1pyLBR44';
 
-let oauthClient: OAuth2Client | null = null;
-
 /**
- * إنشاء عميل OAuth 2.0
- */
-function getOAuthClient(): OAuth2Client {
-  if (oauthClient) return oauthClient;
-
-  oauthClient = new OAuth2Client(
-    OAUTH_CLIENT_ID,
-    OAUTH_CLIENT_SECRET,
-    OAUTH_REDIRECT_URL
-  );
-
-  // تحميل tokens المحفوظة إن وجدت
-  if (fs.existsSync(TOKENS_PATH)) {
-    try {
-      const tokens = JSON.parse(fs.readFileSync(TOKENS_PATH, 'utf-8'));
-      oauthClient.setCredentials(tokens);
-      console.log('✅ تم تحميل OAuth tokens من الملف');
-    } catch (error) {
-      console.error('❌ خطأ في تحميل OAuth tokens:', error);
-    }
-  }
-
-  return oauthClient;
-}
-
-/**
- * الحصول على رابط المصادقة
- */
-export function getAuthorizationUrl(): string {
-  const client = getOAuthClient();
-  const scopes = ['https://www.googleapis.com/auth/drive.file'];
-  
-  const authUrl = client.generateAuthUrl({
-    access_type: 'offline',
-    scope: scopes,
-    prompt: 'consent',
-  });
-
-  return authUrl;
-}
-
-/**
- * معالجة رمز المصادقة وحفظ tokens
- */
-export async function handleAuthorizationCode(code: string): Promise<boolean> {
-  try {
-    const client = getOAuthClient();
-    const { tokens } = await client.getToken(code);
-    
-    client.setCredentials(tokens);
-    
-    // حفظ tokens في ملف
-    fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokens, null, 2));
-    console.log('✅ تم حفظ OAuth tokens بنجاح');
-    
-    return true;
-  } catch (error) {
-    console.error('❌ خطأ في معالجة رمز المصادقة:', error);
-    return false;
-  }
-}
-
-/**
- * التحقق من وجود tokens صحيحة
- */
-export async function hasValidTokens(): Promise<boolean> {
-  try {
-    if (!fs.existsSync(TOKENS_PATH)) {
-      return false;
-    }
-
-    const client = getOAuthClient();
-    const credentials = client.credentials;
-    
-    if (!credentials.access_token) {
-      return false;
-    }
-
-    // اختبار الاتصال
-    const drive = google.drive({ version: 'v3', auth: client });
-    await drive.files.get({
-      fileId: DRIVE_FOLDER_ID,
-      fields: 'id',
-    });
-
-    return true;
-  } catch (error) {
-    console.error('❌ tokens غير صحيحة أو منتهية الصلاحية:', error);
-    return false;
-  }
-}
-
-/**
- * رفع ملف PDF إلى Google Drive
- * @param fileName - اسم الملف
+ * رفع ملف PDF إلى Google Drive عبر Google Apps Script
  * @param pdfBuffer - محتوى ملف PDF (Buffer)
+ * @param fileName - اسم الملف
  * @param fileType - نوع الملف (meeting أو evaluation)
- * @returns معرّف الملف في Google Drive
+ * @returns معرّف الملف أو رابط الملف
  */
 export async function uploadPdfToGoogleDrive(
-  fileName: string,
   pdfBuffer: Buffer,
+  fileName: string,
   fileType: 'meeting' | 'evaluation'
-): Promise<string | null> {
+): Promise<{ success: boolean; fileId?: string; fileUrl?: string; error?: string }> {
   try {
-    // التحقق من وجود tokens صحيحة
-    const hasTokens = await hasValidTokens();
-    if (!hasTokens) {
-      console.warn('⚠️ لا توجد OAuth tokens صحيحة. يرجى المصادقة أولاً.');
-      return null;
-    }
+    // تحويل Buffer إلى Base64
+    const encodedString = pdfBuffer.toString('base64');
 
-    const client = getOAuthClient();
-    const drive = google.drive({ version: 'v3', auth: client });
-
-    // إنشاء مجلد فرعي حسب نوع الملف إذا لم يكن موجوداً
+    // إنشاء اسم مجلد فرعي حسب نوع الملف
     const subFolderName = fileType === 'meeting' ? 'محاضر الاجتماعات' : 'تقارير التقييم';
-    let subFolderId = await getOrCreateSubFolder(drive, DRIVE_FOLDER_ID, subFolderName);
 
-    // رفع الملف باستخدام MediaIoBaseUpload
-    const response = await drive.files.create({
-      requestBody: {
-        name: fileName,
-        mimeType: 'application/pdf',
-        parents: [subFolderId],
+    // إرسال الملف إلى Google Apps Script
+    const payload = {
+      fileName: fileName,
+      fileContent: encodedString,
+      subFolder: subFolderName,
+      parentFolderId: DRIVE_FOLDER_ID,
+    };
+
+    console.log(`📤 جاري رفع الملف: ${fileName} إلى Google Drive عبر Apps Script...`);
+
+    const response = await axios.post(APPS_SCRIPT_URL, payload, {
+      timeout: 30000, // timeout 30 ثانية
+      headers: {
+        'Content-Type': 'application/json',
       },
-      media: {
-        mimeType: 'application/pdf',
-        body: Readable.from(pdfBuffer),
-      },
-      fields: 'id, webViewLink',
     });
 
-    console.log(`✅ تم رفع الملف إلى Google Drive: ${fileName} (ID: ${response.data.id})`);
-    console.log(`   الرابط: ${response.data.webViewLink}`);
-    
-    return response.data.id || null;
+    if (response.data.success) {
+      console.log(`✅ تم رفع الملف بنجاح: ${fileName}`);
+      console.log(`   معرّف الملف: ${response.data.fileId}`);
+      console.log(`   رابط الملف: ${response.data.fileUrl}`);
+      
+      return {
+        success: true,
+        fileId: response.data.fileId,
+        fileUrl: response.data.fileUrl,
+      };
+    } else {
+      console.error(`❌ فشل الرفع: ${response.data.error}`);
+      return {
+        success: false,
+        error: response.data.error || 'فشل الرفع إلى Google Drive',
+      };
+    }
   } catch (error: any) {
     console.error(`❌ خطأ في رفع الملف إلى Google Drive:`, {
       message: error.message,
       code: error.code,
-      status: error.status,
+      status: error.response?.status,
+      data: error.response?.data,
     });
-    return null;
+
+    return {
+      success: false,
+      error: error.message || 'خطأ في الاتصال بـ Google Apps Script',
+    };
   }
 }
 
 /**
- * الحصول على مجلد فرعي أو إنشاؤه إذا لم يكن موجوداً
- */
-async function getOrCreateSubFolder(drive: any, parentFolderId: string, folderName: string): Promise<string> {
-  try {
-    // البحث عن المجلد
-    const response = await drive.files.list({
-      q: `'${parentFolderId}' in parents and name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      spaces: 'drive',
-      fields: 'files(id)',
-      pageSize: 1,
-    });
-
-    if (response.data.files && response.data.files.length > 0) {
-      return response.data.files[0].id;
-    }
-
-    // إنشاء المجلد إذا لم يكن موجوداً
-    const createResponse = await drive.files.create({
-      requestBody: {
-        name: folderName,
-        mimeType: 'application/vnd.google-apps.folder',
-        parents: [parentFolderId],
-      },
-      fields: 'id',
-    });
-
-    console.log(`✅ تم إنشاء مجلد جديد: ${folderName}`);
-    return createResponse.data.id;
-  } catch (error: any) {
-    console.error(`❌ خطأ في إنشاء/الحصول على المجلد:`, {
-      message: error.message,
-      code: error.code,
-      status: error.status,
-    });
-    throw error;
-  }
-}
-
-/**
- * اختبار الاتصال بـ Google Drive
+ * اختبار الاتصال بـ Google Apps Script
  */
 export async function testGoogleDriveConnection(): Promise<boolean> {
   try {
-    const hasTokens = await hasValidTokens();
-    if (!hasTokens) {
-      console.warn('⚠️ لا توجد OAuth tokens صحيحة');
+    console.log('🔍 اختبار الاتصال بـ Google Apps Script...');
+
+    const response = await axios.post(
+      APPS_SCRIPT_URL,
+      { test: true },
+      { timeout: 10000 }
+    );
+
+    if (response.data.success) {
+      console.log('✅ الاتصال بـ Google Apps Script ناجح');
+      return true;
+    } else {
+      console.error('❌ فشل الاتصال:', response.data.error);
       return false;
     }
-
-    const client = getOAuthClient();
-    const drive = google.drive({ version: 'v3', auth: client });
-
-    // محاولة الوصول إلى المجلد الرئيسي
-    const response = await drive.files.get({
-      fileId: DRIVE_FOLDER_ID,
-      fields: 'id, name',
-    });
-
-    console.log(`✅ اتصال Google Drive ناجح - المجلد: ${response.data.name}`);
-    return true;
   } catch (error: any) {
-    console.error(`❌ فشل الاتصال بـ Google Drive:`, {
-      message: error.message,
-      code: error.code,
-      status: error.status,
-    });
+    console.error('❌ خطأ في اختبار الاتصال:', error.message);
     return false;
   }
 }
 
 /**
- * قائمة بالمجلدات المتاحة
+ * دالة مساعدة للرفع المباشر (للاستخدام في pdfGenerator)
  */
-export async function listAvailableFolders(): Promise<any[]> {
+export async function uploadPdfDirectly(
+  pdfBuffer: Buffer,
+  fileName: string,
+  fileType: 'meeting' | 'evaluation'
+): Promise<void> {
   try {
-    const hasTokens = await hasValidTokens();
-    if (!hasTokens) {
-      console.warn('⚠️ لا توجد OAuth tokens صحيحة');
-      return [];
+    const result = await uploadPdfToGoogleDrive(pdfBuffer, fileName, fileType);
+    
+    if (!result.success) {
+      console.warn(`⚠️ تحذير: فشل رفع ${fileName} إلى Google Drive: ${result.error}`);
+      // لا نرمي خطأ هنا - نسمح للعملية بالاستمرار حتى لو فشل الرفع
     }
-
-    const client = getOAuthClient();
-    const drive = google.drive({ version: 'v3', auth: client });
-
-    const response = await drive.files.list({
-      q: "mimeType='application/vnd.google-apps.folder' and trashed=false",
-      spaces: 'drive',
-      fields: 'files(id, name)',
-      pageSize: 10,
-    });
-
-    return response.data.files || [];
   } catch (error) {
-    console.error('❌ خطأ في قائمة المجلدات:', error);
-    return [];
+    console.error(`⚠️ خطأ غير متوقع في رفع ${fileName}:`, error);
+    // لا نرمي خطأ - العملية تستمر
   }
 }

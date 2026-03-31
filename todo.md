@@ -113,3 +113,14 @@
 - [x] تحديث اختبارات Google Drive
 - [ ] اختبار OAuth Flow كاملاً والتحقق من الرفع التلقائي
 - [ ] إنشاء واجهة مصادقة OAuth في الواجهة الأمامية
+
+
+## تطبيق Google Apps Script للرفع التلقائي (مارس 2026 - الجولة 3)
+- [x] تحويل من OAuth 2.0 إلى Google Apps Script كوسيط
+- [x] بناء googleDrive.ts باستخدام axios و Google Apps Script
+- [x] دالة uploadPdfToGoogleDrive ترسل Base64 إلى Apps Script
+- [x] دالة uploadPdfDirectly للاستدعاء التلقائي من pdfGenerator
+- [x] ربط الرفع التلقائي مع generateMeetingPdf و generateEvaluationPdf
+- [x] تحديث اختبارات Google Drive
+- [ ] اختبار الرفع التلقائي الكامل والتحقق من الملفات في Google Drive
+- [ ] إضافة رسائل نجاح/فشل في الواجهة الأمامية

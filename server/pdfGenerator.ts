@@ -6,7 +6,7 @@
  */
 import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
-import { uploadPdfToGoogleDrive } from "./googleDrive";
+import { uploadPdfDirectly } from "./googleDrive";
 
 // إنشاء browser مشترك (singleton) لتقليل استهلاك الذاكرة
 let browserInstance: any = null;
@@ -347,9 +347,7 @@ export async function generateMeetingPdf(data: {
   
   // رفع PDF إلى Google Drive تلقائياً
   const fileName = `محضر_${data.hijriDate}_${data.title?.slice(0, 20) || 'بدون_عنوان'}.pdf`;
-  uploadPdfToGoogleDrive(fileName, pdfBuffer, 'meeting').catch(err => {
-    console.error('خطأ في رفع المحضر إلى Google Drive:', err);
-  });
+  uploadPdfDirectly(pdfBuffer, fileName, 'meeting');
   
   return pdfBuffer;
 }
@@ -456,9 +454,7 @@ export async function generateEvaluationPdf(data: {
   
   // رفع PDF إلى Google Drive تلقائياً
   const fileName = `تقرير_${data.reportNumber}_${data.axis?.slice(0, 15) || 'بدون_محور'}.pdf`;
-  uploadPdfToGoogleDrive(fileName, pdfBuffer, 'evaluation').catch(err => {
-    console.error('خطأ في رفع التقرير إلى Google Drive:', err);
-  });
+  uploadPdfDirectly(pdfBuffer, fileName, 'evaluation');
   
   return pdfBuffer;
 }
