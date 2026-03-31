@@ -1,40 +1,13 @@
 /**
- * خدمة توليد PDF باستخدام Puppeteer (Chrome مضمّن)
- * يدعم العربية وRTL بشكل كامل عبر HTML/CSS
- * يعمل في بيئة Development وProduction
+ * خدمة توليد PDF عبر Google Apps Script
+ * يرسل HTML إلى Google Apps Script الذي يحوله إلى PDF ويحفظه في Google Drive
+ * يدعم العربية وRTL بشكل كامل
  */
-import puppeteer from "puppeteer";
+import axios from "axios";
 
-// مسار Chrome - يستخدم المضمّن في puppeteer تلقائياً
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || puppeteer.executablePath();
-
-// إنشاء browser مشترك (singleton)
-let browserInstance: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
-
-async function getBrowser() {
-  if (browserInstance) {
-    try {
-      await browserInstance.version();
-      return browserInstance;
-    } catch {
-      browserInstance = null;
-    }
-  }
-  browserInstance = await puppeteer.launch({
-    executablePath: CHROMIUM_PATH,
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--no-first-run",
-      "--no-zygote",
-      "--single-process",
-    ],
-  });
-  return browserInstance;
-}
+// رابط Google Apps Script
+const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL || 
+  "https://script.google.com/macros/s/AKfycbzwym4kfmdQbknzPHmuJxNU7PsJSDT0j-S8GosiF3WQpPGZnXvA0cSKa7HtscVrFkgnWQ/exec";
 
 // ألوان الشركتين
 const COMPANY_COLORS = {
@@ -98,145 +71,177 @@ function getBaseCSS(primary: string, accent: string): string {
       font-size: 10px;
       font-weight: 600;
       color: white;
-      background: rgba(0,0,0,0.2);
-      padding: 2px 6px;
-      border-radius: 3px;
     }
-    .header-right { text-align: right; flex: 1; }
-    .header-left  { text-align: left; font-size: 11px; opacity: 0.85; }
-    .company-name { font-size: 20px; font-weight: 700; margin-bottom: 3px; }
-    .doc-type     { font-size: 12px; opacity: 0.85; }
-    .accent-bar   { height: 5px; background: ${accent}; }
+    .header-right {
+      flex: 1;
+      text-align: right;
+      padding-right: 20px;
+    }
+    .company-name {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .doc-type {
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0.95;
+    }
+    .header-left { flex: 1; }
+    .accent-bar { height: 4px; background: ${accent}; }
     .info-bar {
-      background: #f0f4fa;
-      border-right: 4px solid ${accent};
-      padding: 10px 20px;
-      margin: 18px 28px 0;
+      background: #f5f5f5;
+      padding: 10px 28px;
+      font-size: 11px;
+      color: #666;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
-      color: ${primary};
-      font-weight: 600;
+    }
+    .content {
+      padding: 28px;
+      min-height: 400px;
+    }
+    .section {
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
       border-radius: 4px;
+      overflow: hidden;
     }
-    .content { padding: 18px 28px; }
-    .meeting-title {
-      font-size: 17px;
-      font-weight: 700;
-      color: #1a1a1a;
-      margin-bottom: 6px;
-      padding-bottom: 8px;
-      border-bottom: 2.5px solid ${accent};
-    }
-    .section { margin-top: 18px; }
     .section-header {
       background: ${primary};
       color: white;
-      padding: 7px 14px;
+      padding: 10px 14px;
+      font-weight: 600;
       font-size: 12px;
-      font-weight: 700;
-      border-radius: 4px 4px 0 0;
     }
-    .section-body { border: 1px solid #dde4f0; border-top: none; border-radius: 0 0 4px 4px; }
-    .row {
-      padding: 8px 14px;
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      border-bottom: 1px solid #eef1f8;
+    .section-body {
+      padding: 12px 14px;
     }
-    .row:last-child { border-bottom: none; }
-    .row:nth-child(even) { background: #f7f9fd; }
-    .row-num {
-      color: ${accent};
-      font-weight: 700;
-      font-size: 11px;
-      min-width: 20px;
-      text-align: center;
-      flex-shrink: 0;
-    }
-    .row-text { flex: 1; font-size: 12px; }
-    .attendees-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-    }
-    .attendee-cell {
-      padding: 7px 14px;
-      font-size: 12px;
-      border-bottom: 1px solid #eef1f8;
-      border-left: 1px solid #eef1f8;
-    }
-    .attendee-cell:nth-child(odd) { border-left: none; }
     .data-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 10px 14px;
-      border-bottom: 1px solid #eef1f8;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
     }
     .data-row:last-child { border-bottom: none; }
-    .data-row:nth-child(even) { background: #f7f9fd; }
-    .data-label { font-size: 10px; color: #888; font-weight: 600; }
-    .data-value { font-size: 12px; font-weight: 600; color: #222; max-width: 70%; text-align: right; }
-    .score-box {
-      background: #f7f9fd;
-      border-right: 4px solid ${accent};
-      padding: 16px 20px;
-      margin: 18px 0;
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      border-radius: 0 4px 4px 0;
+    .data-label {
+      font-weight: 600;
+      color: #555;
+      min-width: 100px;
     }
-    .score-number { font-size: 48px; font-weight: 700; line-height: 1; }
-    .score-label  { font-size: 11px; color: #888; margin-bottom: 4px; }
-    .score-info   { flex: 1; }
-    .progress-bar { height: 8px; background: #dde4f0; border-radius: 4px; margin-top: 8px; overflow: hidden; }
-    .progress-fill { height: 100%; border-radius: 4px; }
-    .footer {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      background: ${primary};
-      color: rgba(255,255,255,0.85);
-      padding: 10px 28px;
+    .data-value {
+      color: #222;
+      text-align: left;
+      flex: 1;
+    }
+    .score-box {
+      background: #f9f9f9;
+      border: 2px solid ${accent};
+      border-radius: 4px;
+      padding: 20px;
+      margin: 20px 0;
       display: flex;
       justify-content: space-between;
-      font-size: 9px;
+      align-items: center;
     }
+    .score-label {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .score-number {
+      font-size: 36px;
+      font-weight: 700;
+      margin: 4px 0;
+    }
+    .score-info {
+      flex: 1;
+      padding-right: 20px;
+    }
+    .progress-bar {
+      height: 8px;
+      background: #ddd;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .progress-fill {
+      height: 100%;
+      transition: width 0.3s;
+    }
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+    .table th {
+      background: ${primary};
+      color: white;
+      padding: 10px;
+      text-align: right;
+      font-weight: 600;
+      font-size: 11px;
+    }
+    .table td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      font-size: 11px;
+    }
+    .table tr:nth-child(even) { background: #f9f9f9; }
     .signature-area {
-      margin-top: 24px;
-      padding-top: 8px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 60px;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #ddd;
     }
-    .signature-block { text-align: center; }
-    .signature-line { width: 120px; border-top: 1px solid #aaa; margin-bottom: 6px; }
-    .signature-name { font-size: 10px; color: #555; }
-    .signature-role { font-size: 9px; color: #aaa; }
+    .signature-block {
+      display: inline-block;
+      text-align: center;
+      min-width: 150px;
+    }
+    .signature-line {
+      border-top: 1px solid #222;
+      margin-bottom: 4px;
+      width: 150px;
+    }
+    .signature-name {
+      font-weight: 600;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    .signature-role {
+      font-size: 10px;
+      color: #666;
+    }
+    .footer {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      background: #f5f5f5;
+      padding: 8px 28px;
+      border-top: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #666;
+    }
   `;
 }
 
-// ===== توليد PDF المحضر =====
+// ===== توليد PDF محضر الاجتماع =====
 export async function generateMeetingPdf(data: {
   id: number;
-  title: string;
+  company: string;
   hijriDate: string;
   dayOfWeek: string;
-  elements: string;
-  recommendations: string;
-  attendees: string[];
-  company: string;
+  title: string;
+  elements: string[];
+  recommendations: string[];
   department?: string;
-  meetingNumber?: string;
+  attendees: string[];
+  meetingNumber: string;
   createdByName?: string;
 }): Promise<Buffer> {
   const colors = COMPANY_COLORS[data.company as keyof typeof COMPANY_COLORS] || COMPANY_COLORS.quraish;
-  const deptLabel = data.department ? (DEPT_MAP[data.department] || data.department) : "";
-  const elements = (data.elements || "").split("\n").filter(e => e.trim());
-  const recs = (data.recommendations || "").split("\n").filter(r => r.trim());
-  const attendees = (data.attendees || []).filter(a => a.trim());
 
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -249,7 +254,7 @@ export async function generateMeetingPdf(data: {
   <div class="header">
     <div class="header-logo">
       <div class="logo-image">ق</div>
-      <div class="logo-number">${data.meetingNumber || "1447/0001"}</div>
+      <div class="logo-number">${data.meetingNumber || "1447/0000"}</div>
     </div>
     <div class="header-right">
       <div class="company-name">${colors.name}</div>
@@ -262,43 +267,69 @@ export async function generateMeetingPdf(data: {
 
   <div class="info-bar">
     <span>${data.dayOfWeek}  |  ${data.hijriDate}</span>
-    ${deptLabel ? `<span>${deptLabel}</span>` : ""}
   </div>
 
   <div class="content">
-    <div class="meeting-title">${data.title || "—"}</div>
+    <div class="section">
+      <div class="section-header">معلومات الاجتماع</div>
+      <div class="section-body">
+        <div class="data-row">
+          <span class="data-label">العنوان</span>
+          <span class="data-value">${data.title || "—"}</span>
+        </div>
+        ${data.department ? `
+        <div class="data-row">
+          <span class="data-label">الإدارة</span>
+          <span class="data-value">${DEPT_MAP[data.department] || data.department}</span>
+        </div>` : ""}
+      </div>
+    </div>
 
-    ${elements.length > 0 ? `
+    ${data.elements && data.elements.length > 0 ? `
     <div class="section">
       <div class="section-header">عناصر الاجتماع</div>
       <div class="section-body">
-        ${elements.map((item, i) => `
-          <div class="row">
-            <span class="row-num">${i + 1}</span>
-            <span class="row-text">${item}</span>
-          </div>`).join("")}
+        <table class="table">
+          <tbody>
+            ${data.elements.map((elem, idx) => `
+            <tr>
+              <td style="width: 30px; text-align: center;">${idx + 1}</td>
+              <td>${elem}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
       </div>
     </div>` : ""}
 
-    ${recs.length > 0 ? `
+    ${data.recommendations && data.recommendations.length > 0 ? `
     <div class="section">
       <div class="section-header">التوصيات</div>
       <div class="section-body">
-        ${recs.map((rec, i) => `
-          <div class="row">
-            <span class="row-num">${i + 1}</span>
-            <span class="row-text">${rec}</span>
-          </div>`).join("")}
+        <table class="table">
+          <tbody>
+            ${data.recommendations.map((rec, idx) => `
+            <tr>
+              <td style="width: 30px; text-align: center;">${idx + 1}</td>
+              <td>${rec}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
       </div>
     </div>` : ""}
 
-    ${attendees.length > 0 ? `
+    ${data.attendees && data.attendees.length > 0 ? `
     <div class="section">
       <div class="section-header">الحضور</div>
       <div class="section-body">
-        <div class="attendees-grid">
-          ${attendees.map(att => `<div class="attendee-cell">${att}</div>`).join("")}
-        </div>
+        <table class="table">
+          <tbody>
+            ${data.attendees.map((att, idx) => `
+            <tr>
+              <td style="width: 30px; text-align: center;">${idx + 1}</td>
+              <td>${att}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
       </div>
     </div>` : ""}
 
@@ -320,7 +351,7 @@ export async function generateMeetingPdf(data: {
 </body>
 </html>`;
 
-  return renderHtmlToPdf(html);
+  return sendHtmlToGoogleAppsScript(html, `محضر_${data.meetingNumber || "1447-0000"}.pdf`);
 }
 
 // ===== توليد PDF تقرير التقييم =====
@@ -428,22 +459,52 @@ export async function generateEvaluationPdf(data: {
 </body>
 </html>`;
 
-  return renderHtmlToPdf(html);
+  return sendHtmlToGoogleAppsScript(html, `تقرير_${data.reportNumber || "1447-0001"}.pdf`);
 }
 
-// ===== دالة التوليد المشتركة =====
-async function renderHtmlToPdf(html: string): Promise<Buffer> {
-  const browser = await getBrowser();
-  const page = await browser.newPage();
+// ===== دالة الإرسال إلى Google Apps Script =====
+async function sendHtmlToGoogleAppsScript(html: string, fileName: string): Promise<Buffer> {
   try {
-    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 30000 });
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "0", right: "0", bottom: "0", left: "0" },
+    console.log(`📤 جاري إرسال HTML إلى Google Apps Script: ${fileName}`);
+
+    const response = await axios.post(
+      APPS_SCRIPT_URL,
+      {
+        html: html,
+        fileName: fileName,
+      },
+      {
+        timeout: 60000, // timeout 60 ثانية
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (response.data.success) {
+      console.log(`✅ تم توليد PDF بنجاح: ${fileName}`);
+      console.log(`   رابط الملف: ${response.data.fileUrl}`);
+      
+      // تحميل الملف من Google Drive
+      const pdfResponse = await axios.get(response.data.downloadUrl, {
+        responseType: "arraybuffer",
+        timeout: 30000,
+      });
+      
+      return Buffer.from(pdfResponse.data);
+    } else {
+      throw new Error(`فشل توليد PDF: ${response.data.error}`);
+    }
+  } catch (error: any) {
+    console.error(`❌ خطأ في توليد PDF عبر Google Apps Script:`, {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      data: error.response?.data,
     });
-    return Buffer.from(pdfBuffer);
-  } finally {
-    await page.close();
+
+    throw new Error(
+      `فشل توليد PDF: ${error.message || "خطأ في الاتصال بـ Google Apps Script"}`
+    );
   }
 }

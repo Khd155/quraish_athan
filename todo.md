@@ -106,3 +106,12 @@
 - [ ] إضافة زر في قائمة التقارير بجانب كل عنصر
 - [ ] إضافة toast notifications لرسائل النجاح/الفشل
 - [ ] اختبار الرفع من الأزرار والتحقق من الملفات في Google Drive
+
+
+## تطبيق Google Apps Script لتحويل HTML إلى PDF (مارس 2026 - الجولة 5)
+- [x] تحديث pdfGenerator.ts لإرسال HTML إلى Google Apps Script بدلاً من Puppeteer
+- [x] تحديث دالة generateMeetingPdf لاستخدام Google Apps Script
+- [x] تحديث دالة generateEvaluationPdf لاستخدام Google Apps Script
+- [x] إضافة معالجة الأخطاء والرسائل عند الرفع الناجح/الفاشل
+- [ ] اختبار الرفع الكامل من المحاضر والتقارير
+- [ ] التحقق من أن الملفات تُحفظ في Google Drive بشكل صحيح

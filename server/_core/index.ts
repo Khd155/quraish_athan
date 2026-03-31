@@ -52,10 +52,11 @@ async function startServer() {
         hijriDate: meeting.hijriDate,
         dayOfWeek: meeting.dayOfWeek || "",
         title: meeting.title,
-        elements: meeting.elements || "",
-        recommendations: meeting.recommendations || "",
+        elements: (typeof meeting.elements === 'string' ? meeting.elements.split('\n').filter(e => e.trim()) : meeting.elements) || [],
+        recommendations: (typeof meeting.recommendations === 'string' ? meeting.recommendations.split('\n').filter(r => r.trim()) : meeting.recommendations) || [],
         department: meeting.department || undefined,
-        attendees: (meeting.attendees as string[]) || [],
+        attendees: (typeof meeting.attendees === 'string' ? [meeting.attendees] : Array.isArray(meeting.attendees) ? meeting.attendees : []) || [],
+        meetingNumber: `1447/${String(meeting.id).padStart(4, "0")}`,
         createdByName: meeting.createdByName || undefined,
       });
       res.setHeader("Content-Type", "application/pdf");
