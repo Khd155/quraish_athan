@@ -9,9 +9,28 @@ import { ONE_YEAR_MS } from "@shared/const";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { TRPCError } from "@trpc/server";
+import { handleAuthorizationCode, getAuthorizationUrl, testGoogleDriveConnection } from "./googleDrive";
 
 export const appRouter = router({
   system: systemRouter,
+
+  // ===== Google Drive OAuth =====
+  googleDrive: router({
+    getAuthUrl: publicProcedure.query(async () => {
+      const url = getAuthorizationUrl();
+      return { url };
+    }),
+    handleCallback: publicProcedure
+      .input(z.object({ code: z.string() }))
+      .mutation(async ({ input }) => {
+        const success = await handleAuthorizationCode(input.code);
+        return { success };
+      }),
+    testConnection: publicProcedure.query(async () => {
+      const success = await testGoogleDriveConnection();
+      return { success };
+    }),
+  }),
 
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

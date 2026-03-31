@@ -96,3 +96,20 @@
 - [x] إعداد متغير PUPPETEER_CACHE_DIR في بيئة Production
 - [x] تحديث pdfGenerator لاستخدام مسار Chrome الصحيح مع fallback آمن
 - [x] اختبار PDF في Production بعد النشر
+
+## ربط Google Drive لرفع PDF تلقائي (مارس 2026)
+- [x] حفظ Service Account JSON وإعداد متغيرات البيئة
+- [x] بناء خدمة Google Drive في Node.js (googleDrive.ts)
+- [x] تعديل pdfGenerator لرفع PDF تلقائياً بعد الإنشاء
+- [ ] اختبار الرفع التلقائي والتحقق من الملفات في Google Drive
+
+
+## تطبيق OAuth 2.0 للرفع التلقائي (مارس 2026 - الجولة 2)
+- [x] تحويل من Service Account إلى OAuth 2.0 Flow
+- [x] إضافة بيانات OAuth 2.0 (Client ID + Secret)
+- [x] بناء googleDrive.ts باستخدام OAuth2Client
+- [x] حفظ tokens محلياً للاستخدام المتكرر
+- [x] إضافة مسارات OAuth في routers.ts (getAuthUrl, handleCallback, testConnection)
+- [x] تحديث اختبارات Google Drive
+- [ ] اختبار OAuth Flow كاملاً والتحقق من الرفع التلقائي
+- [ ] إنشاء واجهة مصادقة OAuth في الواجهة الأمامية
