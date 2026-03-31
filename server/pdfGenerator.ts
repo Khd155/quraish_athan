@@ -23,6 +23,18 @@ const DEPT_MAP: Record<string, string> = {
   cultural:    "الإدارة الثقافية",
   media:       "الإدارة الإعلامية",
   supervisors: "إدارة المشرفين",
+  registration: "التسجيل",
+  mina_preparation: "تجهيز منى",
+  arafat_preparation: "تجهيز عرفات",
+  muzdalifah_preparation: "تجهيز مزدلفة",
+  quality: "الجودة",
+  other: "أخرى",
+};
+
+// روابط الشعارات
+const COMPANY_LOGOS = {
+  quraish: "https://d2xsxph8kpxj0f.cloudfront.net/310519663346868864/TJtk4unPLR36oJYebaM6yg/شعار-قريش-1_17ec4ed1.png",
+  azan: "https://d2xsxph8kpxj0f.cloudfront.net/310519663346868864/TJtk4unPLR36oJYebaM6yg/شعار-أذان-1_6264f9ba.png",
 };
 
 // CSS المشترك لجميع ملفات PDF
@@ -52,11 +64,11 @@ function getBaseCSS(primary: string, accent: string): string {
       flex-direction: column;
       align-items: center;
       text-align: center;
-      min-width: 80px;
+      min-width: 100px;
     }
     .logo-image {
-      width: 50px;
-      height: 50px;
+      width: 70px;
+      height: 70px;
       background: white;
       border-radius: 4px;
       display: flex;
@@ -65,12 +77,21 @@ function getBaseCSS(primary: string, accent: string): string {
       font-weight: 700;
       color: ${primary};
       font-size: 18px;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .logo-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
     .logo-number {
-      font-size: 10px;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 700;
       color: white;
+      background: rgba(0,0,0,0.2);
+      padding: 4px 8px;
+      border-radius: 3px;
     }
     .header-right {
       flex: 1;
@@ -253,7 +274,9 @@ export async function generateMeetingPdf(data: {
 <div class="page">
   <div class="header">
     <div class="header-logo">
-      <div class="logo-image">ق</div>
+      <div class="logo-image">
+        <img src="${COMPANY_LOGOS[data.company as keyof typeof COMPANY_LOGOS]}" alt="logo" />
+      </div>
       <div class="logo-number">${data.meetingNumber || "1447/0000"}</div>
     </div>
     <div class="header-right">
@@ -382,7 +405,9 @@ export async function generateEvaluationPdf(data: {
 <div class="page">
   <div class="header">
     <div class="header-logo">
-      <div class="logo-image">ق</div>
+      <div class="logo-image">
+        <img src="${COMPANY_LOGOS[data.company as keyof typeof COMPANY_LOGOS]}" alt="logo" />
+      </div>
       <div class="logo-number">${data.reportNumber || "1447/0001"}</div>
     </div>
     <div class="header-right">
