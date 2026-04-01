@@ -1,6 +1,6 @@
 /**
  * خدمة توليد PDF عبر Google Apps Script
- * تم تحديث التصميم بناءً على هوية شركة قريش 2026
+ * تصميم جديد يطابق ملف PDF المرجعي - هيدر أزرق، حدود برتقالية، جداول محسّنة
  */
 import axios from "axios";
 
@@ -8,23 +8,23 @@ import axios from "axios";
 const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL || 
   "https://script.google.com/macros/s/AKfycbzwym4kfmdQbknzPHmuJxNU7PsJSDT0j-S8GosiF3WQpPGZnXvA0cSKa7HtscVrFkgnWQ/exec";
 
-// ألوان الهوية البصرية 2026
+// ألوان التصميم الجديد (بناءً على ملف PDF المرجعي)
 const COMPANY_COLORS = {
   quraish: { 
-    primary: "#4A3382",   // الخزامي الرئيسي
-    accent: "#CFB88F",    // البيج الذهبي
-    secondary: "#6B5CA6", // الخزامي فاتح
+    primary: "#1a4a8a",   // الأزرق الداكن (الهيدر والتذييل)
+    accent: "#e6981a",    // البرتقالي (الحدود والتمييز)
+    secondary: "#f5f5f5", // الرمادي الفاتح (خلفيات الصفوف)
     name: "شركة قريش المحدودة" 
   },
   azan: { 
     primary: "#1a5c3a", 
     accent: "#c8a820", 
-    secondary: "#2d7a4d",
+    secondary: "#f5f5f5",
     name: "شركة أذان المحدودة" 
   },
 };
 
-// خريطة الإدارات المحدثة
+// خريطة الإدارات
 const DEPT_MAP: Record<string, string> = {
   technology:  "إدارة التقنية",
   catering:    "إدارة الإعاشة",
@@ -40,7 +40,7 @@ const DEPT_MAP: Record<string, string> = {
   other: "أخرى",
 };
 
-// CSS المشترك بتصميم 2026
+// CSS المشترك - تصميم جديد يطابق ملف PDF المرجعي
 function getBaseCSS(primary: string, accent: string, secondary: string): string {
   return `
     @import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&display=swap');
@@ -57,76 +57,210 @@ function getBaseCSS(primary: string, accent: string, secondary: string): string 
     }
     .page { width: 210mm; min-height: 297mm; padding: 0; position: relative; }
     
-    .besmalah { 
-      text-align: center; padding: 12px 0 5px; font-size: 12px; color: ${primary}; font-weight: 600;
-    }
-
+    /* ===== الهيدر الأزرق ===== */
     .header {
-      border-bottom: 4px solid ${accent};
+      background: ${primary};
+      color: white;
       padding: 20px 45px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: #fff;
     }
-    .header-logo { display: flex; align-items: center; gap: 15px; }
+    
+    .header-logo { 
+      display: flex; 
+      align-items: center; 
+      gap: 15px;
+    }
+    
     .logo-box {
-      width: 60px; height: 60px;
-      background: ${primary}; border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      color: white; font-size: 28px; font-weight: bold;
+      width: 50px; 
+      height: 50px;
+      background: white;
+      border-radius: 4px;
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      color: ${primary}; 
+      font-size: 24px; 
+      font-weight: bold;
     }
-    .company-name { font-size: 18px; font-weight: 700; color: ${primary}; }
-    .doc-type { font-size: 14px; font-weight: 600; color: ${accent}; }
+    
+    .header-center {
+      text-align: center;
+      flex: 1;
+    }
+    
+    .company-name { 
+      font-size: 18px; 
+      font-weight: 700; 
+      color: white;
+      margin-bottom: 4px;
+    }
+    
+    .doc-type { 
+      font-size: 12px; 
+      font-weight: 600; 
+      color: white;
+      opacity: 0.9;
+    }
+    
+    .header-right {
+      text-align: left;
+    }
+    
+    .header-field {
+      margin-bottom: 8px;
+    }
+    
+    .header-label {
+      font-size: 10px;
+      opacity: 0.8;
+    }
+    
+    .header-value {
+      font-size: 14px;
+      font-weight: 700;
+    }
 
+    /* ===== شريط المعلومات ===== */
     .info-bar {
-      background: ${primary}; color: white;
-      padding: 8px 45px;
-      font-size: 11px;
-      display: flex; justify-content: space-between;
+      background: #f5f5f5;
+      padding: 12px 45px;
+      font-size: 12px;
+      display: flex; 
+      justify-content: space-between;
+      align-items: center;
+      border-right: 4px solid ${accent};
+    }
+    
+    .info-bar-left {
+      color: ${primary};
       font-weight: 600;
     }
-    .content { padding: 35px 45px; min-height: 400px; }
     
+    .info-bar-right {
+      color: ${primary};
+      font-weight: 600;
+    }
+
+    /* ===== المحتوى ===== */
+    .content { 
+      padding: 30px 45px; 
+      min-height: 400px; 
+    }
+    
+    .title {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid ${accent};
+    }
+    
+    /* ===== رؤوس الأقسام ===== */
     .section-header {
-      border-right: 4px solid ${accent};
-      padding-right: 12px; margin-bottom: 15px;
-      color: ${primary}; font-weight: 700; font-size: 14px;
+      background: ${primary};
+      color: white;
+      padding: 12px 15px;
+      margin-bottom: 15px;
+      margin-top: 20px;
+      font-weight: 700;
+      font-size: 13px;
     }
 
-    .data-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+    /* ===== الجداول ===== */
+    .data-table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-bottom: 25px; 
+      background: white;
+    }
+    
     .data-table th {
-      background: #fcfaff; color: ${primary};
-      padding: 10px 15px; text-align: right; border: 1px solid ${secondary}33;
-      width: 25%; font-size: 12px;
+      background: ${primary};
+      color: white;
+      padding: 12px 15px; 
+      text-align: right; 
+      font-weight: 700;
+      font-size: 12px;
+      border: 1px solid #ddd;
     }
+    
     .data-table td {
-      padding: 10px 15px; border: 1px solid ${secondary}33;
-      font-size: 12px; color: #444;
+      padding: 12px 15px; 
+      border: 1px solid #ddd;
+      text-align: right;
+    }
+    
+    .data-table tr:nth-child(even) { 
+      background: ${secondary};
+    }
+    
+    .data-table tr:hover {
+      background: #efefef;
     }
 
-    .list-item { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
-    .item-num {
-      min-width: 22px; height: 22px; background: ${accent};
-      color: white; border-radius: 4px; display: flex;
-      align-items: center; justify-content: center; font-weight: bold; font-size: 11px;
+    /* ===== أرقام التسلسل ===== */
+    .item-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: ${accent};
+      color: white;
+      border-radius: 3px;
+      font-weight: 700;
+      font-size: 11px;
     }
 
-    .recommendations-box {
-      background: #fcfaff; border: 1px dashed ${secondary};
-      padding: 15px 20px; border-radius: 8px; margin-top: 10px;
+    /* ===== التوقيع ===== */
+    .signature-area {
+      margin-top: 40px;
+      padding-top: 30px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 60px;
+    }
+    
+    .sig-block {
+      text-align: center;
+      min-width: 140px;
+    }
+    
+    .sig-line {
+      border-top: 2px solid #333;
+      margin-bottom: 8px;
+      width: 140px;
+    }
+    
+    .sig-name {
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+    
+    .sig-role {
+      font-size: 10px;
+      color: #666;
     }
 
-    .signature-area { margin-top: 50px; display: flex; justify-content: flex-end; }
-    .sig-block { text-align: center; width: 180px; }
-    .sig-line { border-top: 1px solid ${primary}; margin-bottom: 5px; }
-    .sig-name { font-weight: 700; color: ${primary}; }
-
+    /* ===== التذييل الأزرق ===== */
     .footer {
-      position: absolute; bottom: 0; width: 100%;
-      border-top: 1px solid ${accent}; padding: 12px 45px;
-      display: flex; justify-content: space-between;
-      font-size: 10px; color: ${primary}; font-weight: 600;
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      background: ${primary};
+      color: white;
+      padding: 12px 45px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 600;
     }
   `;
 }
@@ -138,17 +272,17 @@ export async function generateMeetingPdf(data: {
   hijriDate: string;
   dayOfWeek: string;
   title: string;
-  elements: string[];
-  recommendations: string[];
-  department?: string;
+  department: string;
   customDepartment?: string;
-  attendees: string[];
-  meetingNumber: string;
+  elements?: string[];
+  recommendations?: string[];
+  attendees?: string[];
   createdByName?: string;
+  meetingNumber?: string;
 }): Promise<Buffer> {
   const colors = COMPANY_COLORS[data.company as keyof typeof COMPANY_COLORS] || COMPANY_COLORS.quraish;
   
-  const deptDisplay = data.department === "other" && data.customDepartment 
+  const departmentDisplay = data.customDepartment 
     ? data.customDepartment 
     : (DEPT_MAP[data.department as string] || data.department || "—");
 
@@ -160,43 +294,74 @@ export async function generateMeetingPdf(data: {
 </head>
 <body>
 <div class="page">
-  <div class="besmalah">بسم الله الرحمن الرحيم</div>
+  <!-- الهيدر الأزرق -->
   <div class="header">
     <div class="header-logo">
-      <div class="logo-box">${data.company === 'quraish' ? 'ق' : 'أ'}</div>
-      <div class="company-name">${colors.name}</div>
+      <div class="logo-box">ق</div>
+      <div>
+        <div style="font-size: 14px; font-weight: 700;">${colors.name}</div>
+        <div style="font-size: 11px; opacity: 0.9;">محضر اجتماع</div>
+      </div>
     </div>
-    <div class="doc-type">محضر اجتماع رسمي</div>
+    <div class="header-center">
+      <div class="company-name">${colors.name}</div>
+      <div class="doc-type">محضر اجتماع</div>
+    </div>
+    <div class="header-right">
+      <div class="header-field">
+        <div class="header-label">رقم المرجع</div>
+        <div class="header-value">${data.meetingNumber || "1447/0001"}</div>
+      </div>
+    </div>
   </div>
 
+  <!-- شريط المعلومات -->
   <div class="info-bar">
-    <span>اليوم: ${data.dayOfWeek}</span>
-    <span>التاريخ: ${data.hijriDate} هـ</span>
-    <span>المرجع: ${data.meetingNumber || "1447/0000"}</span>
+    <div class="info-bar-left">${departmentDisplay}</div>
+    <div class="info-bar-right">التاريخ | ${data.hijriDate || "—"}</div>
   </div>
 
+  <!-- المحتوى -->
   <div class="content">
-    <div class="section-header">بيانات الاجتماع الأساسية</div>
-    <table class="data-table">
-      <tr><th>موضوع الاجتماع</th><td>${data.title || "—"}</td></tr>
-      <tr><th>الإدارة / القسم</th><td>${deptDisplay}</td></tr>
-    </table>
+    <div class="title">${data.title || "محضر اجتماع"}</div>
 
     ${data.elements && data.elements.length > 0 ? `
-    <div class="section-header">أجندة وعناصر الاجتماع</div>
-    ${data.elements.map((e, i) => `
-      <div class="list-item">
-        <div class="item-num">${i + 1}</div>
-        <div>${e}</div>
-      </div>
-    `).join("")}
+    <div class="section-header">عناصر الاجتماع</div>
+    <table class="data-table">
+      <tbody>
+        ${data.elements.map((elem, idx) => `
+        <tr>
+          <td><span class="item-number">${idx + 1}</span></td>
+          <td>${elem}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
     ` : ""}
 
     ${data.recommendations && data.recommendations.length > 0 ? `
-    <div style="margin-top:25px;" class="section-header">التوصيات والقرارات</div>
-    <div class="recommendations-box">
-      ${data.recommendations.map(r => `<p style="margin-bottom:6px;">• ${r}</p>`).join("")}
-    </div>
+    <div class="section-header">التوصيات</div>
+    <table class="data-table">
+      <tbody>
+        ${data.recommendations.map((rec, idx) => `
+        <tr>
+          <td><span class="item-number">${idx + 1}</span></td>
+          <td>${rec}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+    ` : ""}
+
+    ${data.attendees && data.attendees.length > 0 ? `
+    <div class="section-header">الحضور</div>
+    <table class="data-table">
+      <tbody>
+        ${data.attendees.map((att, idx) => `
+        <tr>
+          <td><span class="item-number">${idx + 1}</span></td>
+          <td>${att}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
     ` : ""}
 
     ${data.createdByName ? `
@@ -204,14 +369,16 @@ export async function generateMeetingPdf(data: {
       <div class="sig-block">
         <div class="sig-line"></div>
         <div class="sig-name">${data.createdByName}</div>
-        <div style="font-size:10px; color:#666;">مُعد المحضر</div>
+        <div class="sig-role">مُعد المحضر</div>
       </div>
     </div>
     ` : ""}
   </div>
 
+  <!-- التذييل الأزرق -->
   <div class="footer">
-    <span>نظام التوثيق والمتابعة</span>
+    <span>نظام التوثيق الذكي - ${colors.name}</span>
+    <span>${data.hijriDate || "—"}</span>
   </div>
 </div>
 </body>
@@ -235,7 +402,7 @@ export async function generateEvaluationPdf(data: {
   createdByName?: string;
 }): Promise<Buffer> {
   const colors = COMPANY_COLORS[data.company as keyof typeof COMPANY_COLORS] || COMPANY_COLORS.quraish;
-  const scoreColor = data.score >= 70 ? "#1a9e3a" : data.score >= 50 ? "#e6981a" : "#d32f2f";
+  const scoreColor = data.score >= 70 ? "#1a9e3a" : data.score >= 50 ? colors.accent : "#d32f2f";
   const progressPct = Math.min(100, Math.max(0, data.score));
 
   const html = `<!DOCTYPE html>
@@ -246,46 +413,71 @@ export async function generateEvaluationPdf(data: {
 </head>
 <body>
 <div class="page">
-  <div class="besmalah">بسم الله الرحمن الرحيم</div>
+  <!-- الهيدر الأزرق -->
   <div class="header">
     <div class="header-logo">
-      <div class="logo-box">ت</div>
-      <div class="company-name">${colors.name}</div>
+      <div class="logo-box">ق</div>
+      <div>
+        <div style="font-size: 14px; font-weight: 700;">${colors.name}</div>
+        <div style="font-size: 11px; opacity: 0.9;">تقرير تقييم</div>
+      </div>
     </div>
-    <div class="doc-type">تقرير تقييم الأداء</div>
+    <div class="header-center">
+      <div class="company-name">${colors.name}</div>
+      <div class="doc-type">تقرير تقييم</div>
+    </div>
+    <div class="header-right">
+      <div class="header-field">
+        <div class="header-label">رقم التقرير</div>
+        <div class="header-value">${data.reportNumber || "1447/0001"}</div>
+      </div>
+    </div>
   </div>
 
+  <!-- شريط المعلومات -->
   <div class="info-bar">
-    <span>التاريخ: ${data.hijriDate} هـ</span>
-    <span>الرقم المرجعي: ${data.reportNumber || "1447/0001"}</span>
+    <div class="info-bar-left">قسم الجودة والتميز المؤسسي</div>
+    <div class="info-bar-right">التاريخ | ${data.hijriDate || "—"}</div>
   </div>
 
+  <!-- المحتوى -->
   <div class="content">
-    <div class="section-header">بيانات التقييم</div>
+    <div class="title">تقرير التقييم</div>
+
+    <div class="section-header">معلومات التقييم</div>
     <table class="data-table">
-      <tr><th>المحور الأساسي</th><td>${data.axis || "—"}</td></tr>
-      <tr><th>المسار التشغيلي</th><td>${data.track || "—"}</td></tr>
-      <tr><th>المعيار المطبق</th><td>${data.criterion || "—"}</td></tr>
+      <tbody>
+        <tr>
+          <td style="font-weight: 600;">المحور:</td>
+          <td>${data.axis || "—"}</td>
+        </tr>
+        <tr>
+          <td style="font-weight: 600;">المسار:</td>
+          <td>${data.track || "—"}</td>
+        </tr>
+        <tr>
+          <td style="font-weight: 600;">المعيار:</td>
+          <td>${data.criterion || "—"}</td>
+        </tr>
+      </tbody>
     </table>
 
-    <div style="display:flex; align-items:center; gap:30px; margin:30px 0; background:#f9f9f9; padding:20px; border-radius:10px; border:1px solid ${colors.accent};">
-      <div style="text-align:center;">
-        <div style="font-size:11px; color:#666;">النتيجة النهائية</div>
-        <div style="font-size:42px; font-weight:bold; color:${scoreColor};">${data.score}%</div>
+    <div class="section-header">النتيجة</div>
+    <div style="padding: 20px; background: white; border: 2px solid ${colors.accent}; border-radius: 4px; margin-bottom: 20px;">
+      <div style="text-align: center; margin-bottom: 15px;">
+        <div style="font-size: 36px; font-weight: 700; color: ${scoreColor};">${data.score}</div>
+        <div style="font-size: 12px; color: #666;">من 100</div>
       </div>
-      <div style="flex:1;">
-        <div style="height:12px; background:#ddd; border-radius:6px; overflow:hidden;">
-          <div style="width:${progressPct}%; height:100%; background:${scoreColor};"></div>
-        </div>
-        <div style="margin-top:8px; font-weight:bold; color:${scoreColor}; font-size:14px;">
-          ${data.score >= 70 ? "أداء متميز" : data.score >= 50 ? "أداء مرضٍ" : "يحتاج إلى تطوير"}
-        </div>
+      <div style="background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden;">
+        <div style="background: ${scoreColor}; height: 100%; width: ${progressPct}%; transition: width 0.3s;"></div>
       </div>
     </div>
 
     ${data.notes ? `
-    <div class="section-header">الملاحظات والتوصيات</div>
-    <div style="white-space:pre-wrap; padding:15px; background:#fff; border:1px solid #eee; border-radius:6px;">${data.notes}</div>
+    <div class="section-header">الملاحظات</div>
+    <div style="padding: 15px; background: #f5f5f5; border-right: 4px solid ${colors.accent}; margin-bottom: 20px;">
+      ${data.notes}
+    </div>
     ` : ""}
 
     ${data.createdByName ? `
@@ -293,14 +485,16 @@ export async function generateEvaluationPdf(data: {
       <div class="sig-block">
         <div class="sig-line"></div>
         <div class="sig-name">${data.createdByName}</div>
-        <div style="font-size:10px; color:#666;">المُقيم المسؤول</div>
+        <div class="sig-role">معد التقرير</div>
       </div>
     </div>
     ` : ""}
   </div>
 
+  <!-- التذييل الأزرق -->
   <div class="footer">
-    <span>نظام التوثيق والمتابعة</span>
+    <span>نظام التوثيق الذكي - ${colors.name}</span>
+    <span>${data.hijriDate || "—"}</span>
   </div>
 </div>
 </body>
@@ -338,10 +532,10 @@ async function sendHtmlToGoogleAppsScript(html: string, fileName: string): Promi
       
       return Buffer.from(pdfResponse.data);
     } else {
-      throw new Error(`فشل توليد PDF: ${response.data.error}`);
+      throw new Error(response.data.error || "فشل توليد PDF");
     }
   } catch (error: any) {
-    console.error(`❌ خطأ في الاتصال بـ Google Apps Script:`, error.message);
-    throw new Error(`فشل توليد PDF: ${error.message}`);
+    console.error(`❌ خطأ في توليد PDF: ${error.message}`);
+    throw error;
   }
 }
