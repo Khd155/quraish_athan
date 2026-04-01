@@ -24,6 +24,12 @@ const DEPARTMENTS = [
   { value: "cultural", label: "الإدارة الثقافية" },
   { value: "media", label: "الإدارة الإعلامية" },
   { value: "supervisors", label: "إدارة المشرفين" },
+  { value: "registration", label: "التسجيل" },
+  { value: "mina_preparation", label: "تجهيز منى" },
+  { value: "arafat_preparation", label: "تجهيز عرفات" },
+  { value: "muzdalifah_preparation", label: "تجهيز مزدلفة" },
+  { value: "quality", label: "الجودة" },
+  { value: "other", label: "أخرى" },
 ];
 
 export default function MeetingForm() {
@@ -39,6 +45,7 @@ export default function MeetingForm() {
   const [elements, setElements] = useState<string[]>([""]);
   const [recommendations, setRecommendations] = useState<string[]>([""]);
   const [department, setDepartment] = useState("");
+  const [customDepartment, setCustomDepartment] = useState("");
   const [attendees, setAttendees] = useState<string[]>([""]);
   const [entityId, setEntityId] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -78,6 +85,7 @@ export default function MeetingForm() {
       const recStr = (existingMeeting.recommendations as string) || "";
       setRecommendations(recStr ? recStr.split("\n").filter(r => r.trim()) : [""]);
       setDepartment(existingMeeting.department || "");
+      setCustomDepartment((existingMeeting as any).customDepartment || "");
       setAttendees((existingMeeting.attendees as string[]) || [""]);
       setEntityId(existingMeeting.id);
     }
@@ -109,7 +117,8 @@ export default function MeetingForm() {
       title: title.trim(),
       elements: elements.filter(e => e.trim()).join("\n"),
       recommendations: recommendations.filter(r => r.trim()).join("\n"),
-      department: department as "technology" | "catering" | "transport" | "cultural" | "media" | "supervisors" | undefined || undefined,
+      department: department as any || undefined,
+      customDepartment: customDepartment.trim() || undefined,
       attendees: attendees.filter(a => a.trim()),
       status,
     };
@@ -279,6 +288,19 @@ export default function MeetingForm() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Custom Department - shown when "other" is selected */}
+          {department === "other" && (
+            <div className="space-y-2">
+              <Label>اسم الإدارة المخصصة</Label>
+              <Input
+                type="text"
+                value={customDepartment}
+                onChange={(e) => setCustomDepartment(e.target.value)}
+                placeholder="أدخل اسم الإدارة"
+              />
+            </div>
+          )}
 
           {/* Elements */}
           <div className="space-y-2">
