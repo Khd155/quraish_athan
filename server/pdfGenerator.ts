@@ -95,27 +95,62 @@ function getBaseCSS(primary: string, accent: string, light: string, secondary: s
       letter-spacing: 1px;
     }
     
-    /* ===== الهيدر ===== */
+    /* ===== الهيدر - تصميم ثلاثي الأعمدة ===== */
     .header {
-      background: ${primary};
-      color: white;
-      padding: 18px 40px;
+      background: white;
+      padding: 20px 40px;
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
+      border-bottom: 2px solid ${accent};
+      min-height: 140px;
     }
     
-    .header-logo { 
-      display: flex; 
-      align-items: center; 
+    /* العمود الأيسر - حقول الملء */
+    .header-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
       gap: 14px;
+      padding-right: 20px;
+    }
+    
+    .header-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #333;
+    }
+    
+    .header-field-label {
+      font-weight: 600;
+      color: #333;
+      min-width: 60px;
+    }
+    
+    .header-field-line {
+      flex: 1;
+      border-bottom: 1px solid ${accent};
+      height: 1px;
+    }
+    
+    /* العمود الأوسط - الشعار والاسم */
+    .header-center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 0 20px;
     }
     
     .logo-box {
-      width: 48px; 
-      height: 48px;
+      width: 60px; 
+      height: 60px;
       background: white;
-      border-radius: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
       display: flex; 
       align-items: center; 
       justify-content: center;
@@ -123,45 +158,66 @@ function getBaseCSS(primary: string, accent: string, light: string, secondary: s
     }
     
     .logo-box img {
-      width: 42px;
-      height: 42px;
+      width: 55px;
+      height: 55px;
       object-fit: contain;
     }
     
     .logo-letter {
       color: ${primary}; 
-      font-size: 26px; 
+      font-size: 28px; 
       font-weight: 700;
     }
     
-    .header-info {
-      display: flex;
-      flex-direction: column;
-    }
-    
     .company-name { 
-      font-size: 20px; 
+      font-size: 18px; 
       font-weight: 700; 
-      color: white;
+      color: ${primary};
+      text-align: center;
       line-height: 1.3;
     }
     
     .doc-type { 
-      font-size: 12px; 
-      color: rgba(255,255,255,0.85);
+      font-size: 11px; 
+      color: #666;
+      text-align: center;
       margin-top: 2px;
     }
     
+    /* العمود الأيمن - معلومات المملكة والصندوق الأزرق */
+    .header-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+      padding-left: 20px;
+    }
+    
+    .header-kingdom {
+      text-align: right;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #333;
+    }
+    
+    .kingdom-line {
+      font-weight: 600;
+      color: ${primary};
+    }
+    
     .ref-box {
-      text-align: left;
-      border: 1px solid rgba(255,255,255,0.4);
-      padding: 6px 14px;
-      border-radius: 4px;
-      min-width: 100px;
+      background: #1a5c7a;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 3px;
+      min-width: 140px;
+      text-align: center;
+      margin-top: 8px;
     }
     
     .ref-number {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 700;
       color: white;
       text-align: center;
