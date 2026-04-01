@@ -11,8 +11,8 @@ const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL ||
 // ألوان التصميم الجديد (بناءً على ملف PDF المرجعي)
 const COMPANY_COLORS = {
   quraish: { 
-    primary: "#1a4a8a",   // الأزرق الداكن (الهيدر والتذييل)
-    accent: "#e6981a",    // البرتقالي (الحدود والتمييز)
+    primary: "#4A3382",   // الخزامي الرئيسي (الهيدر والتذييل)
+    accent: "#CFB88F",    // البيج الذهبي (الحدود والتمييز)
     secondary: "#f5f5f5", // الرمادي الفاتح (خلفيات الصفوف)
     name: "شركة قريش المحدودة" 
   },
@@ -43,11 +43,9 @@ const DEPT_MAP: Record<string, string> = {
 // CSS المشترك - تصميم جديد يطابق ملف PDF المرجعي
 function getBaseCSS(primary: string, accent: string, secondary: string): string {
   return `
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&display=swap');
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Noto Naskh Arabic', 'Arial', 'Tahoma', sans-serif;
+      font-family: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
       direction: rtl;
       text-align: right;
       color: #333;
@@ -57,7 +55,17 @@ function getBaseCSS(primary: string, accent: string, secondary: string): string 
     }
     .page { width: 210mm; min-height: 297mm; padding: 0; position: relative; }
     
-    /* ===== الهيدر الأزرق ===== */
+    /* ===== البسملة ===== */
+    .besmalah {
+      text-align: center;
+      padding: 10px 0;
+      font-size: 12px;
+      color: ${primary};
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    
+    /* ===== الهيدر ===== */
     .header {
       background: ${primary};
       color: white;
@@ -294,7 +302,10 @@ export async function generateMeetingPdf(data: {
 </head>
 <body>
 <div class="page">
-  <!-- الهيدر الأزرق -->
+  <!-- البسملة -->
+  <div class="besmalah">بسم الله الرحمن الرحيم</div>
+  
+  <!-- الهيدر -->
   <div class="header">
     <div class="header-logo">
       <div class="logo-box">ق</div>
@@ -413,7 +424,10 @@ export async function generateEvaluationPdf(data: {
 </head>
 <body>
 <div class="page">
-  <!-- الهيدر الأزرق -->
+  <!-- البسملة -->
+  <div class="besmalah">بسم الله الرحمن الرحيم</div>
+  
+  <!-- الهيدر -->
   <div class="header">
     <div class="header-logo">
       <div class="logo-box">ق</div>
