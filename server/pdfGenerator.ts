@@ -85,16 +85,7 @@ function getBaseCSS(primary: string, accent: string, light: string, secondary: s
       padding-bottom: 50px;
     }
     
-    /* ===== البسملة ===== */
-    .besmalah {
-      text-align: center;
-      padding: 12px 0 6px 0;
-      font-size: 13px;
-      color: ${primary};
-      font-weight: 400;
-      letter-spacing: 1px;
-    }
-    
+
     /* ===== الهيدر - تصميم ثلاثي الأعمدة ===== */
     .header {
       background: white;

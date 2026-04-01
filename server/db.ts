@@ -195,6 +195,32 @@ export async function deleteMeeting(id: number) {
 }
 
 // ============ عمليات تقارير التقييم ============
+// دالة مشتركة لجلب أكبر رقم من المحاضر والتقارير
+export async function getNextDocumentNumber(hijriYear: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // جلب أكبر رقم من التقارير
+  const reportCounterRecord = await db.select().from(reportCounters).where(eq(reportCounters.year, hijriYear)).limit(1);
+  const reportLastNumber = reportCounterRecord.length > 0 ? reportCounterRecord[0].lastNumber : 0;
+
+  // جلب أكبر رقم من المحاضر (من معرّف آخر محضر)
+  const lastMeeting = await db.select().from(meetings).orderBy(desc(meetings.id)).limit(1);
+  const meetingLastNumber = lastMeeting.length > 0 ? lastMeeting[0].id : 0;
+
+  // أخذ أكبر قيمة من الاثنين
+  const nextNum = Math.max(reportLastNumber, meetingLastNumber) + 1;
+
+  // تحديث جدول reportCounters
+  if (reportCounterRecord.length === 0) {
+    await db.insert(reportCounters).values({ year: hijriYear, lastNumber: nextNum });
+  } else {
+    await db.update(reportCounters).set({ lastNumber: nextNum }).where(eq(reportCounters.id, reportCounterRecord[0].id));
+  }
+
+  return `${hijriYear}/${String(nextNum).padStart(4, "0")}`;
+}
+
 export async function getNextReportNumber(hijriYear: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

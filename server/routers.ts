@@ -166,7 +166,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const hijriYear = input.hijriDate.split("/")[0] || "1447";
-        const reportNumber = await db.getNextReportNumber(hijriYear);
+        const reportNumber = await db.getNextDocumentNumber(hijriYear);
         const id = await db.createEvaluationReport({
           ...input,
           reportNumber,
@@ -294,7 +294,7 @@ export const appRouter = router({
             attendees: (typeof meeting.attendees === 'string' ? [meeting.attendees] : Array.isArray(meeting.attendees) ? meeting.attendees : []) || [],
             company: meeting.company,
             department: meeting.department || undefined,
-            meetingNumber: `1447/${String(meeting.id).padStart(4, "0")}`,
+            meetingNumber: `1447/${String(meeting.id).padStart(4, "0")}`, // TODO: استخدام getNextDocumentNumber
             createdByName: meeting.createdByName || "",
           });
 
