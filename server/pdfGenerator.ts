@@ -1,87 +1,30 @@
 /**
- * خدمة توليد PDF باستخدام Puppeteer مباشرةً
- * تم تحديث التصميم بناءً على هوية شركة قريش 2026 دون تغيير في منطق الكود
+ * خدمة توليد PDF عبر Google Apps Script
+ * تم تحديث التصميم بناءً على هوية شركة قريش 2026
  */
+import axios from "axios";
 
-import puppeteer, { Browser } from "puppeteer";
-import * as path from "path";
-import * as fs from "fs";
+// رابط Google Apps Script
+const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL || 
+  "https://script.google.com/macros/s/AKfycbzwym4kfmdQbknzPHmuJxNU7PsJSDT0j-S8GosiF3WQpPGZnXvA0cSKa7HtscVrFkgnWQ/exec";
 
-// ─── إدارة Browser كـ Singleton لتجنب فتح نسخ متعددة ───────────────────────
-let browserInstance: Browser | null = null;
-
-async function getBrowser(): Promise<Browser> {
-  if (browserInstance && browserInstance.connected) {
-    return browserInstance;
-  }
-
-  const chromeCandidates = [
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-    process.env.CHROME_BIN,
-    "/usr/bin/google-chrome-stable",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium-browser",
-    "/usr/bin/chromium",
-    "/snap/bin/chromium",
-  ].filter(Boolean) as string[];
-
-  let executablePath: string | undefined;
-  for (const p of chromeCandidates) {
-    if (fs.existsSync(p)) {
-      executablePath = p;
-      break;
-    }
-  }
-
-  if (!executablePath) {
-    console.warn(
-      "⚠️  لم يُعثر على Chrome في المسارات المعروفة — سيستخدم Puppeteer المُضمَّن.\n" +
-      "   إذا فشل التشغيل، حدّد المسار يدوياً عبر: PUPPETEER_EXECUTABLE_PATH=/path/to/chrome"
-    );
-  }
-
-  browserInstance = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--font-render-hinting=none",
-    ],
-  });
-
-  process.on("exit", () => { browserInstance?.close(); });
-
-  return browserInstance;
-}
-
-// ─── الحل #4: دوال تعقيم البيانات الفارغة ──────────────────────────────────
-function sanitize(value: unknown, fallback = "—"): string {
-  if (value === null || value === undefined) return fallback;
-  const str = String(value).trim();
-  return str.length > 0 ? str : fallback;
-}
-
-function sanitizeArray(arr: unknown): string[] {
-  if (!Array.isArray(arr)) return [];
-  return arr
-    .map((item) => (typeof item === "string" ? item.trim() : String(item ?? "").trim()))
-    .filter(Boolean);
-}
-
-// ─── ثوابت الهوية البصرية 2026 ────────────────────────────────────────────
+// ألوان الهوية البصرية 2026
 const COMPANY_COLORS = {
   quraish: { 
-    primary: "#4A3382",   // الخزامي [cite: 35, 36]
-    accent: "#CFB88F",    // البيج الذهبي [cite: 37, 38]
-    secondary: "#6B5CA6", // الخزامي الفاتح [cite: 39, 40]
+    primary: "#4A3382",   // الخزامي الرئيسي
+    accent: "#CFB88F",    // البيج الذهبي
+    secondary: "#6B5CA6", // الخزامي فاتح
     name: "شركة قريش المحدودة" 
   },
-  azan: { primary: "#1a5c3a", accent: "#c8a820", name: "شركة أذان المحدودة" },
+  azan: { 
+    primary: "#1a5c3a", 
+    accent: "#c8a820", 
+    secondary: "#2d7a4d",
+    name: "شركة أذان المحدودة" 
+  },
 };
 
+// خريطة الإدارات المحدثة
 const DEPT_MAP: Record<string, string> = {
   technology:  "إدارة التقنية",
   catering:    "إدارة الإعاشة",
@@ -97,9 +40,8 @@ const DEPT_MAP: Record<string, string> = {
   other: "أخرى",
 };
 
-// ─── الحل #1: CSS المحدث بتصميم الهوية 2026 ──────────────────────────────
-function getBaseCSS(primary: string, accent: string, secondary?: string): string {
-  const lightLavender = secondary || "#6B5CA6";
+// CSS المشترك بتصميم 2026
+function getBaseCSS(primary: string, accent: string, secondary: string): string {
   return `
     @import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&display=swap');
 
@@ -127,14 +69,12 @@ function getBaseCSS(primary: string, accent: string, secondary?: string): string
       align-items: center;
       background: #fff;
     }
-    .header-logo {
-      display: flex; align-items: center; gap: 15px;
-    }
-    .logo-image {
+    .header-logo { display: flex; align-items: center; gap: 15px; }
+    .logo-box {
       width: 60px; height: 60px;
       background: ${primary}; border-radius: 6px;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; color: white; font-size: 28px;
+      color: white; font-size: 28px; font-weight: bold;
     }
     .company-name { font-size: 18px; font-weight: 700; color: ${primary}; }
     .doc-type { font-size: 14px; font-weight: 600; color: ${accent}; }
@@ -154,245 +94,256 @@ function getBaseCSS(primary: string, accent: string, secondary?: string): string
       color: ${primary}; font-weight: 700; font-size: 14px;
     }
 
-    .data-row {
-      display: flex; justify-content: space-between;
-      padding: 10px 0; border-bottom: 1px solid #eee;
+    .data-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+    .data-table th {
+      background: #fcfaff; color: ${primary};
+      padding: 10px 15px; text-align: right; border: 1px solid ${secondary}33;
+      width: 25%; font-size: 12px;
     }
-    .data-label { font-weight: 700; color: ${primary}; min-width: 120px; }
-    .data-value { color: #333; flex: 1; text-align: left; }
+    .data-table td {
+      padding: 10px 15px; border: 1px solid ${secondary}33;
+      font-size: 12px; color: #444;
+    }
 
-    .score-box {
-      background: #fcfaff; border: 1px solid ${accent};
-      border-radius: 8px; padding: 25px; margin: 25px 0;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .score-number { font-size: 42px; font-weight: 700; }
-    .progress-bar {
-      height: 10px; background: #eee; border-radius: 5px;
-      overflow: hidden; margin-top: 10px; width: 200px;
-    }
-    .progress-fill { height: 100%; }
-
-    .table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-    .table td { 
-      padding: 12px; border: 1px solid ${lightLavender}33; 
-      font-size: 12px; 
-    }
+    .list-item { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
     .item-num {
-      width: 22px; height: 22px; background: ${accent};
-      color: white; border-radius: 4px; display: inline-flex;
-      align-items: center; justify-content: center; font-weight: bold;
-      margin-left: 10px; font-size: 11px;
+      min-width: 22px; height: 22px; background: ${accent};
+      color: white; border-radius: 4px; display: flex;
+      align-items: center; justify-content: center; font-weight: bold; font-size: 11px;
+    }
+
+    .recommendations-box {
+      background: #fcfaff; border: 1px dashed ${secondary};
+      padding: 15px 20px; border-radius: 8px; margin-top: 10px;
     }
 
     .signature-area { margin-top: 50px; display: flex; justify-content: flex-end; }
-    .signature-block { text-align: center; width: 180px; }
-    .signature-line { border-top: 1px solid ${primary}; margin-bottom: 8px; }
-    .signature-name { font-weight: 700; color: ${primary}; }
+    .sig-block { text-align: center; width: 180px; }
+    .sig-line { border-top: 1px solid ${primary}; margin-bottom: 5px; }
+    .sig-name { font-weight: 700; color: ${primary}; }
 
     .footer {
       position: absolute; bottom: 0; width: 100%;
-      background: #fcfcfc; padding: 12px 45px;
-      border-top: 1px solid ${accent};
+      border-top: 1px solid ${accent}; padding: 12px 45px;
       display: flex; justify-content: space-between;
       font-size: 10px; color: ${primary}; font-weight: 600;
     }
   `;
 }
 
-// ─── دالة مشتركة: HTML → PDF Buffer ─────────────────────────────────────────
-async function htmlToPdfBuffer(html: string): Promise<Buffer> {
-  const browser = await getBrowser();
-  const page = await browser.newPage();
-  try {
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
-    await page.evaluateHandle("document.fonts.ready");
-
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "0", right: "0", bottom: "15mm", left: "0" },
-    });
-
-    return Buffer.from(pdfBuffer);
-  } finally {
-    await page.close();
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// توليد PDF محضر الاجتماع
-// ═══════════════════════════════════════════════════════════════════════════════
+// ===== توليد PDF محضر الاجتماع =====
 export async function generateMeetingPdf(data: {
-  id?: number | null;
-  company?: string | null;
-  hijriDate?: string | null;
-  dayOfWeek?: string | null;
-  title?: string | null;
-  elements?: unknown;
-  recommendations?: unknown;
-  department?: string | null;
-  customDepartment?: string | null; // الحقل المخصص
-  attendees?: unknown;
-  meetingNumber?: string | null;
-  createdByName?: string | null;
+  id: number;
+  company: string;
+  hijriDate: string;
+  dayOfWeek: string;
+  title: string;
+  elements: string[];
+  recommendations: string[];
+  department?: string;
+  customDepartment?: string;
+  attendees: string[];
+  meetingNumber: string;
+  createdByName?: string;
 }): Promise<Buffer> {
-  const companyKey = sanitize(data.company, "quraish");
-  const colors = COMPANY_COLORS[companyKey as keyof typeof COMPANY_COLORS] ?? COMPANY_COLORS.quraish;
-
-  const meetingNumber = sanitize(data.meetingNumber, "1447/0000");
-  const hijriDate      = sanitize(data.hijriDate, "—");
-  const dayOfWeek      = sanitize(data.dayOfWeek, "");
-  const title          = sanitize(data.title, "بدون عنوان");
-  const createdByName = data.createdByName ? sanitize(data.createdByName) : null;
+  const colors = COMPANY_COLORS[data.company as keyof typeof COMPANY_COLORS] || COMPANY_COLORS.quraish;
   
-  // معالجة الإدارة وحقل "أخرى"
-  const department    = data.department ? sanitize(data.department) : null;
-  const deptDisplay   = department === "other" && data.customDepartment 
+  const deptDisplay = data.department === "other" && data.customDepartment 
     ? data.customDepartment 
-    : (department ? (DEPT_MAP[department] ?? department) : null);
-
-  const elements        = sanitizeArray(data.elements);
-  const recommendations = sanitizeArray(data.recommendations);
-  const attendees       = sanitizeArray(data.attendees);
+    : (DEPT_MAP[data.department as string] || data.department || "—");
 
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head><meta charset="UTF-8"><style>${getBaseCSS(colors.primary, colors.accent, colors.secondary)}</style></head>
-<body><div class="page">
+<head>
+  <meta charset="UTF-8">
+  <style>${getBaseCSS(colors.primary, colors.accent, colors.secondary)}</style>
+</head>
+<body>
+<div class="page">
   <div class="besmalah">بسم الله الرحمن الرحيم</div>
   <div class="header">
     <div class="header-logo">
-      <div class="logo-image">${companyKey === 'quraish' ? 'ق' : 'أ'}</div>
+      <div class="logo-box">${data.company === 'quraish' ? 'ق' : 'أ'}</div>
       <div class="company-name">${colors.name}</div>
     </div>
     <div class="doc-type">محضر اجتماع رسمي</div>
   </div>
 
   <div class="info-bar">
-    <span>اليوم: ${dayOfWeek}</span>
-    <span>التاريخ: ${hijriDate} هـ</span>
-    <span>المرجع: ${meetingNumber}</span>
+    <span>اليوم: ${data.dayOfWeek}</span>
+    <span>التاريخ: ${data.hijriDate} هـ</span>
+    <span>المرجع: ${data.meetingNumber || "1447/0000"}</span>
   </div>
 
   <div class="content">
-    <div class="section-header">بيانات الاجتماع</div>
-    <div style="border: 1px solid #eee; padding: 15px; border-radius: 6px; margin-bottom: 25px;">
-        <div class="data-row"><span class="data-label">الموضوع</span><span class="data-value">${title}</span></div>
-        ${deptDisplay ? `<div class="data-row"><span class="data-label">الإدارة</span><span class="data-value">${deptDisplay}</span></div>` : ""}
-    </div>
+    <div class="section-header">بيانات الاجتماع الأساسية</div>
+    <table class="data-table">
+      <tr><th>موضوع الاجتماع</th><td>${data.title || "—"}</td></tr>
+      <tr><th>الإدارة / القسم</th><td>${deptDisplay}</td></tr>
+    </table>
 
-    ${elements.length > 0 ? `
+    ${data.elements && data.elements.length > 0 ? `
     <div class="section-header">أجندة وعناصر الاجتماع</div>
-    <table class="table"><tbody>
-        ${elements.map((e, i) => `<tr><td><span class="item-num">${i+1}</span>${e}</td></tr>`).join("")}
-    </tbody></table>` : ""}
+    ${data.elements.map((e, i) => `
+      <div class="list-item">
+        <div class="item-num">${i + 1}</div>
+        <div>${e}</div>
+      </div>
+    `).join("")}
+    ` : ""}
 
-    ${recommendations.length > 0 ? `
-    <div style="margin-top: 25px;" class="section-header">التوصيات والقرارات</div>
-    <div style="background: #fcfaff; border: 1px dashed ${colors.secondary}; padding: 15px; border-radius: 8px;">
-        ${recommendations.map(r => `<p style="margin-bottom:8px;">• ${r}</p>`).join("")}
-    </div>` : ""}
+    ${data.recommendations && data.recommendations.length > 0 ? `
+    <div style="margin-top:25px;" class="section-header">التوصيات والقرارات</div>
+    <div class="recommendations-box">
+      ${data.recommendations.map(r => `<p style="margin-bottom:6px;">• ${r}</p>`).join("")}
+    </div>
+    ` : ""}
 
-    ${createdByName ? `
+    ${data.createdByName ? `
     <div class="signature-area">
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-name">${createdByName}</div>
+      <div class="sig-block">
+        <div class="sig-line"></div>
+        <div class="sig-name">${data.createdByName}</div>
         <div style="font-size:10px; color:#666;">مُعد المحضر</div>
       </div>
-    </div>` : ""}
+    </div>
+    ` : ""}
   </div>
 
   <div class="footer">
     <span>حجاً مبروراً وسعياً مشكوراً</span>
-    <span>نظام التوثيق - ${colors.name}</span>
+    <span>نظام التوثيق الذكي - ${colors.name}</span>
   </div>
-</div></body></html>`;
+</div>
+</body>
+</html>`;
 
-  return htmlToPdfBuffer(html);
+  return sendHtmlToGoogleAppsScript(html, `محضر_${data.meetingNumber || "1447-0000"}.pdf`);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// توليد PDF تقرير التقييم
-// ═══════════════════════════════════════════════════════════════════════════════
+// ===== توليد PDF تقرير التقييم =====
 export async function generateEvaluationPdf(data: {
-  id?: number | null;
-  reportNumber?: string | null;
-  company?: string | null;
-  hijriDate?: string | null;
-  dayOfWeek?: string | null;
-  axis?: string | null;
-  track?: string | null;
-  criterion?: string | null;
-  score?: number | null;
-  notes?: string | null;
-  createdByName?: string | null;
+  id: number;
+  reportNumber: string;
+  company: string;
+  hijriDate: string;
+  dayOfWeek: string;
+  axis: string;
+  track: string;
+  criterion: string;
+  score: number;
+  notes: string;
+  createdByName?: string;
 }): Promise<Buffer> {
-  const companyKey = sanitize(data.company, "quraish");
-  const colors = COMPANY_COLORS[companyKey as keyof typeof COMPANY_COLORS] ?? COMPANY_COLORS.quraish;
-
-  const reportNumber  = sanitize(data.reportNumber, "1447/0001");
-  const hijriDate      = sanitize(data.hijriDate, "—");
-  const axis           = sanitize(data.axis, "—");
-  const track          = sanitize(data.track, "—");
-  const criterion      = sanitize(data.criterion, "—");
-  const createdByName = data.createdByName ? sanitize(data.createdByName) : null;
-
-  const rawScore = Number(data.score);
-  const score = Number.isFinite(rawScore) ? Math.min(100, Math.max(0, rawScore)) : 0;
-  const scoreColor = score >= 70 ? "#1a9e3a" : score >= 50 ? "#e6981a" : "#d32f2f";
-  const notes = data.notes ? sanitize(data.notes).replace(/\n/g, "<br>") : null;
+  const colors = COMPANY_COLORS[data.company as keyof typeof COMPANY_COLORS] || COMPANY_COLORS.quraish;
+  const scoreColor = data.score >= 70 ? "#1a9e3a" : data.score >= 50 ? "#e6981a" : "#d32f2f";
+  const progressPct = Math.min(100, Math.max(0, data.score));
 
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head><meta charset="UTF-8"><style>${getBaseCSS(colors.primary, colors.accent, colors.secondary)}</style></head>
-<body><div class="page">
+<head>
+  <meta charset="UTF-8">
+  <style>${getBaseCSS(colors.primary, colors.accent, colors.secondary)}</style>
+</head>
+<body>
+<div class="page">
   <div class="besmalah">بسم الله الرحمن الرحيم</div>
   <div class="header">
     <div class="header-logo">
-      <div class="logo-image">ت</div>
+      <div class="logo-box">ت</div>
       <div class="company-name">${colors.name}</div>
     </div>
     <div class="doc-type">تقرير تقييم الأداء</div>
   </div>
 
   <div class="info-bar">
-    <span>التاريخ: ${hijriDate} هـ</span>
-    <span>الرقم المرجعي: ${reportNumber}</span>
+    <span>التاريخ: ${data.hijriDate} هـ</span>
+    <span>الرقم المرجعي: ${data.reportNumber || "1447/0001"}</span>
   </div>
 
   <div class="content">
     <div class="section-header">بيانات التقييم</div>
-    <div style="border: 1px solid #eee; padding: 15px; border-radius: 6px;">
-        <div class="data-row"><span class="data-label">المحور</span><span class="data-value">${axis}</span></div>
-        <div class="data-row"><span class="data-label">المسار</span><span class="data-value">${track}</span></div>
-        <div class="data-row"><span class="data-label">المعيار</span><span class="data-value">${criterion}</span></div>
-    </div>
+    <table class="data-table">
+      <tr><th>المحور الأساسي</th><td>${data.axis || "—"}</td></tr>
+      <tr><th>المسار التشغيلي</th><td>${data.track || "—"}</td></tr>
+      <tr><th>المعيار المطبق</th><td>${data.criterion || "—"}</td></tr>
+    </table>
 
-    <div class="score-box">
-      <div>
-        <div style="font-size: 11px; color: #666; margin-bottom: 5px;">النتيجة الإجمالية</div>
-        <div class="score-number" style="color:${scoreColor}">${score}%</div>
+    <div style="display:flex; align-items:center; gap:30px; margin:30px 0; background:#f9f9f9; padding:20px; border-radius:10px; border:1px solid ${colors.accent};">
+      <div style="text-align:center;">
+        <div style="font-size:11px; color:#666;">النتيجة النهائية</div>
+        <div style="font-size:42px; font-weight:bold; color:${scoreColor};">${data.score}%</div>
       </div>
-      <div style="flex: 1; padding-right: 40px;">
-        <div style="font-size:14px; font-weight:700; color:${scoreColor}">${score >= 70 ? "أداء متميز" : score >= 50 ? "أداء جيد" : "يحتاج تطوير"}</div>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width:${score}%; background:${scoreColor}"></div>
+      <div style="flex:1;">
+        <div style="height:12px; background:#ddd; border-radius:6px; overflow:hidden;">
+          <div style="width:${progressPct}%; height:100%; background:${scoreColor};"></div>
+        </div>
+        <div style="margin-top:8px; font-weight:bold; color:${scoreColor}; font-size:14px;">
+          ${data.score >= 70 ? "أداء متميز" : data.score >= 50 ? "أداء مرضٍ" : "يحتاج إلى تطوير"}
         </div>
       </div>
     </div>
 
-    ${notes ? `
-    <div class="section-header">الملاحظات</div>
-    <div style="padding:15px; background:#fff; border:1px solid #eee; border-radius:6px; font-size:12px;">${notes}</div>` : ""}
+    ${data.notes ? `
+    <div class="section-header">الملاحظات والتوصيات</div>
+    <div style="white-space:pre-wrap; padding:15px; background:#fff; border:1px solid #eee; border-radius:6px;">${data.notes}</div>
+    ` : ""}
+
+    ${data.createdByName ? `
+    <div class="signature-area">
+      <div class="sig-block">
+        <div class="sig-line"></div>
+        <div class="sig-name">${data.createdByName}</div>
+        <div style="font-size:10px; color:#666;">المُقيم المسؤول</div>
+      </div>
+    </div>
+    ` : ""}
   </div>
 
   <div class="footer">
-    <span>${colors.name} | قسم الجودة</span>
+    <span>${colors.name} | قسم الجودة والتميز المؤسسي</span>
     <span>نظام التوثيق - 2026</span>
   </div>
-</div></body></html>`;
+</div>
+</body>
+</html>`;
 
-  return htmlToPdfBuffer(html);
+  return sendHtmlToGoogleAppsScript(html, `تقرير_${data.reportNumber || "1447-0001"}.pdf`);
+}
+
+// ===== دالة الإرسال إلى Google Apps Script =====
+async function sendHtmlToGoogleAppsScript(html: string, fileName: string): Promise<Buffer> {
+  try {
+    console.log(`📤 جاري إرسال HTML إلى Google Apps Script: ${fileName}`);
+
+    const response = await axios.post(
+      APPS_SCRIPT_URL,
+      {
+        html: html,
+        fileName: fileName,
+      },
+      {
+        timeout: 60000, 
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (response.data.success) {
+      console.log(`✅ تم توليد PDF بنجاح: ${fileName}`);
+      
+      const pdfResponse = await axios.get(response.data.downloadUrl, {
+        responseType: "arraybuffer",
+        timeout: 30000,
+      });
+      
+      return Buffer.from(pdfResponse.data);
+    } else {
+      throw new Error(`فشل توليد PDF: ${response.data.error}`);
+    }
+  } catch (error: any) {
+    console.error(`❌ خطأ في الاتصال بـ Google Apps Script:`, error.message);
+    throw new Error(`فشل توليد PDF: ${error.message}`);
+  }
 }
