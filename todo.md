@@ -115,3 +115,19 @@
 - [x] إضافة معالجة الأخطاء والرسائل عند الرفع الناجح/الفاشل
 - [ ] اختبار الرفع الكامل من المحاضر والتقارير
 - [ ] التحقق من أن الملفات تُحفظ في Google Drive بشكل صحيح
+
+
+## إضافة الإدارات الجديدة (مارس 2026 - الجولة 6)
+- [x] تحديث schema لإضافة الإدارات الجديدة (registration, mina_preparation, arafat_preparation, muzdalifah_preparation, quality, other)
+- [x] إضافة حقل customDepartment في جدول meetings
+- [x] توليد migration SQL (drizzle/0005_fast_dark_beast.sql)
+- [ ] تطبيق migration على قاعدة البيانات (يتطلب تفاعل يدوي عبر واجهة إدارة المشروع)
+- [x] تحديث tRPC procedures لقبول الإدارات الجديدة و customDepartment
+- [x] تحديث خريطة الإدارات في pdfGenerator.ts
+- [x] تحديث قائمة الإدارات في MeetingForm.tsx
+- [x] إضافة حقل نص مخصص يظهر عند اختيار "أخرى"
+- [x] تحديث دالة handleSave لإرسال customDepartment
+- [ ] اختبار إنشاء محضر مع الإدارات الجديدة
+- [ ] اختبار عرض حقل النص المخصص عند اختيار "أخرى"
+- [ ] اختبار توليد PDF مع الإدارات الجديدة
+- [ ] اختبار الرفع التلقائي إلى Google Drive

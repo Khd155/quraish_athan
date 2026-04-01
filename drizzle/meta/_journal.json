@@ -22,6 +22,27 @@
       "when": 1774735661253,
       "tag": "0002_tan_sharon_carter",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1774981744049,
+      "tag": "0003_youthful_black_tarantula",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1775048017370,
+      "tag": "0004_glorious_banshee",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1775051555632,
+      "tag": "0005_fast_dark_beast",
+      "breakpoints": true
     }
   ]
 }
