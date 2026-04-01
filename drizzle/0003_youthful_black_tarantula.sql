@@ -1,2 +1,0 @@
-ALTER TABLE `meetings` MODIFY COLUMN `department` enum('technology','catering','transport','cultural','media','supervisors','registration','mina_preparation','arafat_preparation','muzdalifah_preparation','quality','other');--> statement-breakpoint
-ALTER TABLE `meetings` ADD `customDepartment` varchar(255);

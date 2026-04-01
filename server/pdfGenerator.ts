@@ -23,12 +23,6 @@ const DEPT_MAP: Record<string, string> = {
   cultural:    "الإدارة الثقافية",
   media:       "الإدارة الإعلامية",
   supervisors: "إدارة المشرفين",
-  registration: "التسجيل",
-  mina_preparation: "تجهيز منى",
-  arafat_preparation: "تجهيز عرفات",
-  muzdalifah_preparation: "تجهيز مزدلفة",
-  quality: "الجودة",
-  other: "أخرى",
 };
 
 // CSS المشترك لجميع ملفات PDF
