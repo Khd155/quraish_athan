@@ -4,6 +4,7 @@
  * يدعم العربية وRTL بشكل كامل
  */
 import axios from "axios";
+import { getLogoBase64 } from "./logos";
 
 // رابط Google Apps Script
 const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL || 
@@ -31,11 +32,7 @@ const DEPT_MAP: Record<string, string> = {
   other: "أخرى",
 };
 
-// روابط الشعارات
-const COMPANY_LOGOS = {
-  quraish: "https://d2xsxph8kpxj0f.cloudfront.net/310519663346868864/TJtk4unPLR36oJYebaM6yg/شعار-قريش-1_17ec4ed1.png",
-  azan: "https://d2xsxph8kpxj0f.cloudfront.net/310519663346868864/TJtk4unPLR36oJYebaM6yg/شعار-أذان-1_6264f9ba.png",
-};
+// تحويل الشعارات إلى Base64 ديناميكياً
 
 // CSS المشترك لجميع ملفات PDF
 function getBaseCSS(primary: string, accent: string): string {
@@ -275,7 +272,7 @@ export async function generateMeetingPdf(data: {
   <div class="header">
     <div class="header-logo">
       <div class="logo-image">
-        <img src="${COMPANY_LOGOS[data.company as keyof typeof COMPANY_LOGOS]}" alt="logo" />
+        <img src="${getLogoBase64(data.company)}" alt="logo" />
       </div>
       <div class="logo-number">${data.meetingNumber || "1447/0000"}</div>
     </div>
@@ -406,7 +403,7 @@ export async function generateEvaluationPdf(data: {
   <div class="header">
     <div class="header-logo">
       <div class="logo-image">
-        <img src="${COMPANY_LOGOS[data.company as keyof typeof COMPANY_LOGOS]}" alt="logo" />
+        <img src="${getLogoBase64(data.company)}" alt="logo" />
       </div>
       <div class="logo-number">${data.reportNumber || "1447/0001"}</div>
     </div>
