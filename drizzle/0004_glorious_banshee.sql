@@ -1,2 +1,0 @@
-ALTER TABLE `meetings` MODIFY COLUMN `department` enum('technology','catering','transport','cultural','media','supervisors');--> statement-breakpoint
-ALTER TABLE `meetings` DROP COLUMN `customDepartment`;
