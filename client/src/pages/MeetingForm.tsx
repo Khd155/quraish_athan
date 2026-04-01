@@ -24,12 +24,6 @@ const DEPARTMENTS = [
   { value: "cultural", label: "الإدارة الثقافية" },
   { value: "media", label: "الإدارة الإعلامية" },
   { value: "supervisors", label: "إدارة المشرفين" },
-  { value: "registration", label: "التسجيل" },
-  { value: "mina_preparation", label: "تجهيز منى" },
-  { value: "arafat_preparation", label: "تجهيز عرفات" },
-  { value: "muzdalifah_preparation", label: "تجهيز مزدلفة" },
-  { value: "quality", label: "الجودة" },
-  { value: "other", label: "أخرى" },
 ];
 
 export default function MeetingForm() {
@@ -45,7 +39,6 @@ export default function MeetingForm() {
   const [elements, setElements] = useState<string[]>([""]);
   const [recommendations, setRecommendations] = useState<string[]>([""]);
   const [department, setDepartment] = useState("");
-  const [customDepartment, setCustomDepartment] = useState("");
   const [attendees, setAttendees] = useState<string[]>([""]);
   const [entityId, setEntityId] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -116,8 +109,7 @@ export default function MeetingForm() {
       title: title.trim(),
       elements: elements.filter(e => e.trim()).join("\n"),
       recommendations: recommendations.filter(r => r.trim()).join("\n"),
-      department: department as "technology" | "catering" | "transport" | "cultural" | "media" | "supervisors" | "registration" | "mina_preparation" | "arafat_preparation" | "muzdalifah_preparation" | "quality" | "other" | undefined || undefined,
-      customDepartment: department === "other" ? customDepartment : undefined,
+      department: department as "technology" | "catering" | "transport" | "cultural" | "media" | "supervisors" | undefined || undefined,
       attendees: attendees.filter(a => a.trim()),
       status,
     };
@@ -276,10 +268,7 @@ export default function MeetingForm() {
           {/* Department */}
           <div className="space-y-2">
             <Label>الإدارة</Label>
-            <Select value={department} onValueChange={(value) => {
-              setDepartment(value);
-              if (value !== "other") setCustomDepartment("");
-            }}>
+            <Select value={department} onValueChange={setDepartment}>
               <SelectTrigger>
                 <SelectValue placeholder="اختر الإدارة" />
               </SelectTrigger>
@@ -289,15 +278,6 @@ export default function MeetingForm() {
                 ))}
               </SelectContent>
             </Select>
-            {department === "other" && (
-              <Input
-                type="text"
-                value={customDepartment}
-                onChange={(e) => setCustomDepartment(e.target.value)}
-                placeholder="أدخل اسم الإدارة المخصصة"
-                className="mt-2"
-              />
-            )}
           </div>
 
           {/* Elements */}
