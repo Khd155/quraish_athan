@@ -45,7 +45,7 @@ function getBaseCSS(primary: string, accent: string, secondary: string): string 
   return `
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
+      font-family: 'Trebuchet MS', 'Tahoma', 'Arial', sans-serif;
       direction: rtl;
       text-align: right;
       color: #333;
@@ -54,6 +54,12 @@ function getBaseCSS(primary: string, accent: string, secondary: string): string 
       line-height: 1.6;
     }
     .page { width: 210mm; min-height: 297mm; padding: 0; position: relative; }
+    
+    /* ===== خطوط العناوين ===== */
+    h1, h2, h3, .company-name, .section-header {
+      font-family: 'Verdana', 'Tahoma', sans-serif;
+      font-weight: bold;
+    }
     
     /* ===== البسملة ===== */
     .besmalah {
@@ -78,7 +84,8 @@ function getBaseCSS(primary: string, accent: string, secondary: string): string 
     .header-logo { 
       display: flex; 
       align-items: center; 
-      gap: 15px;
+      gap: 12px;
+      flex: 1;
     }
     
     .logo-box {
@@ -95,19 +102,18 @@ function getBaseCSS(primary: string, accent: string, secondary: string): string 
     }
     
     .header-center {
-      text-align: center;
-      flex: 1;
+      display: none;
     }
     
     .company-name { 
-      font-size: 18px; 
+      font-size: 14px; 
       font-weight: 700; 
       color: white;
-      margin-bottom: 4px;
+      margin-bottom: 0;
     }
     
     .doc-type { 
-      font-size: 12px; 
+      font-size: 11px; 
       font-weight: 600; 
       color: white;
       opacity: 0.9;
