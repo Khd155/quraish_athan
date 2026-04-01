@@ -1,7 +1,6 @@
 /**
  * خدمة توليد PDF عبر Google Apps Script
- * يرسل HTML إلى Google Apps Script الذي يحوله إلى PDF ويحفظه في Google Drive
- * يدعم العربية وRTL بشكل كامل
+ * تم تحديث التصميم بناءً على هوية شركة قريش 2026
  */
 import axios from "axios";
 
@@ -9,13 +8,23 @@ import axios from "axios";
 const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL || 
   "https://script.google.com/macros/s/AKfycbzwym4kfmdQbknzPHmuJxNU7PsJSDT0j-S8GosiF3WQpPGZnXvA0cSKa7HtscVrFkgnWQ/exec";
 
-// ألوان الشركتين
+// ألوان الهوية البصرية 2026
 const COMPANY_COLORS = {
-  quraish: { primary: "#1a4a8a", accent: "#e6981a", name: "شركة قريش المحدودة" },
-  azan:    { primary: "#1a5c3a", accent: "#c8a820", name: "شركة أذان المحدودة" },
+  quraish: { 
+    primary: "#4A3382",   // الخزامي الرئيسي
+    accent: "#CFB88F",    // البيج الذهبي
+    secondary: "#6B5CA6", // الخزامي فاتح
+    name: "شركة قريش المحدودة" 
+  },
+  azan: { 
+    primary: "#1a5c3a", 
+    accent: "#c8a820", 
+    secondary: "#2d7a4d",
+    name: "شركة أذان المحدودة" 
+  },
 };
 
-// خريطة الإدارات
+// خريطة الإدارات المحدثة
 const DEPT_MAP: Record<string, string> = {
   technology:  "إدارة التقنية",
   catering:    "إدارة الإعاشة",
@@ -23,6 +32,12 @@ const DEPT_MAP: Record<string, string> = {
   cultural:    "الإدارة الثقافية",
   media:       "الإدارة الإعلامية",
   supervisors: "إدارة المشرفين",
+  registration: "إدارة التسجيل",
+  mina_preparation: "تجهيز منى",
+  arafat_preparation: "تجهيز عرفات",
+  muzdalifah_preparation: "تجهيز مزدلفة",
+  quality: "إدارة الجودة",
+  other: "أخرى",
 };
 
 // ألوان الهوية الجديدة
@@ -35,9 +50,11 @@ const BRAND_COLORS = {
 // CSS المشترك لجميع ملفات PDF - تصميم فاخر جديد
 function getBaseCSS(): string {
   return `
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&display=swap');
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Arial', 'Tahoma', sans-serif;
+      font-family: 'Noto Naskh Arabic', 'Arial', 'Tahoma', sans-serif;
       direction: rtl;
       text-align: right;
       color: #333;
@@ -373,11 +390,16 @@ export async function generateMeetingPdf(data: {
   elements: string[];
   recommendations: string[];
   department?: string;
+  customDepartment?: string;
   attendees: string[];
   meetingNumber: string;
   createdByName?: string;
 }): Promise<Buffer> {
   const colors = COMPANY_COLORS[data.company as keyof typeof COMPANY_COLORS] || COMPANY_COLORS.quraish;
+  
+  const deptDisplay = data.department === "other" && data.customDepartment 
+    ? data.customDepartment 
+    : (DEPT_MAP[data.department as string] || data.department || "—");
 
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -411,6 +433,7 @@ export async function generateMeetingPdf(data: {
         <div class="header-value">محضر اجتماع</div>
       </div>
     </div>
+    <div class="doc-type">محضر اجتماع رسمي</div>
   </div>
 
   <div class="content">
@@ -451,7 +474,8 @@ export async function generateMeetingPdf(data: {
           </tbody>
         </table>
       </div>
-    </div>` : ""}
+    `).join("")}
+    ` : ""}
 
     ${data.recommendations && data.recommendations.length > 0 ? `
     <div class="section">
@@ -487,12 +511,13 @@ export async function generateMeetingPdf(data: {
 
     ${data.createdByName ? `
     <div class="signature-area">
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-name">${data.createdByName}</div>
-        <div class="signature-role">المُعِد</div>
+      <div class="sig-block">
+        <div class="sig-line"></div>
+        <div class="sig-name">${data.createdByName}</div>
+        <div style="font-size:10px; color:#666;">مُعد المحضر</div>
       </div>
-    </div>` : ""}
+    </div>
+    ` : ""}
   </div>
 
   <div class="footer">
@@ -562,6 +587,7 @@ export async function generateEvaluationPdf(data: {
         <div class="header-value">تقرير تقييم</div>
       </div>
     </div>
+    <div class="doc-type">تقرير تقييم الأداء</div>
   </div>
 
   <div class="content">
@@ -591,18 +617,17 @@ export async function generateEvaluationPdf(data: {
       </div>
     </div>
 
-    <div class="score-box">
-      <div>
-        <div class="score-label">الدرجة المحققة</div>
-        <div class="score-number" style="color:${scoreColor}">${data.score}</div>
-        <div style="font-size:11px;color:#888">من 100</div>
+    <div style="display:flex; align-items:center; gap:30px; margin:30px 0; background:#f9f9f9; padding:20px; border-radius:10px; border:1px solid ${colors.accent};">
+      <div style="text-align:center;">
+        <div style="font-size:11px; color:#666;">النتيجة النهائية</div>
+        <div style="font-size:42px; font-weight:bold; color:${scoreColor};">${data.score}%</div>
       </div>
       <div class="score-info">
         <div style="font-size:12px;font-weight:700;color:${scoreColor}">
           ${data.score >= 70 ? "ممتاز" : data.score >= 50 ? "جيد" : "يحتاج تحسين"}
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width:${progressPct}%;background:${scoreColor}"></div>
+        <div style="margin-top:8px; font-weight:bold; color:${scoreColor}; font-size:14px;">
+          ${data.score >= 70 ? "أداء متميز" : data.score >= 50 ? "أداء مرضٍ" : "يحتاج إلى تطوير"}
         </div>
       </div>
     </div>
@@ -617,12 +642,13 @@ export async function generateEvaluationPdf(data: {
 
     ${data.createdByName ? `
     <div class="signature-area">
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-name">${data.createdByName}</div>
-        <div class="signature-role">المُعِد</div>
+      <div class="sig-block">
+        <div class="sig-line"></div>
+        <div class="sig-name">${data.createdByName}</div>
+        <div style="font-size:10px; color:#666;">المُقيم المسؤول</div>
       </div>
-    </div>` : ""}
+    </div>
+    ` : ""}
   </div>
 
   <div class="footer">
@@ -654,7 +680,7 @@ async function sendHtmlToGoogleAppsScript(html: string, fileName: string): Promi
         fileName: fileName,
       },
       {
-        timeout: 60000, // timeout 60 ثانية
+        timeout: 60000, 
         headers: {
           "Content-Type": "application/json",
         },
@@ -663,9 +689,7 @@ async function sendHtmlToGoogleAppsScript(html: string, fileName: string): Promi
 
     if (response.data.success) {
       console.log(`✅ تم توليد PDF بنجاح: ${fileName}`);
-      console.log(`   رابط الملف: ${response.data.fileUrl}`);
       
-      // تحميل الملف من Google Drive
       const pdfResponse = await axios.get(response.data.downloadUrl, {
         responseType: "arraybuffer",
         timeout: 30000,
