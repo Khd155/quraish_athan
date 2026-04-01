@@ -4,7 +4,6 @@
  * يدعم العربية وRTL بشكل كامل
  */
 import axios from "axios";
-import { getLogoBase64 } from "./logos";
 
 // رابط Google Apps Script
 const APPS_SCRIPT_URL = process.env.GOOGLE_APPS_SCRIPT_URL || 
@@ -24,15 +23,7 @@ const DEPT_MAP: Record<string, string> = {
   cultural:    "الإدارة الثقافية",
   media:       "الإدارة الإعلامية",
   supervisors: "إدارة المشرفين",
-  registration: "التسجيل",
-  mina_preparation: "تجهيز منى",
-  arafat_preparation: "تجهيز عرفات",
-  muzdalifah_preparation: "تجهيز مزدلفة",
-  quality: "الجودة",
-  other: "أخرى",
 };
-
-// تحويل الشعارات إلى Base64 ديناميكياً
 
 // CSS المشترك لجميع ملفات PDF
 function getBaseCSS(primary: string, accent: string): string {
@@ -61,11 +52,11 @@ function getBaseCSS(primary: string, accent: string): string {
       flex-direction: column;
       align-items: center;
       text-align: center;
-      min-width: 100px;
+      min-width: 80px;
     }
     .logo-image {
-      width: 70px;
-      height: 70px;
+      width: 50px;
+      height: 50px;
       background: white;
       border-radius: 4px;
       display: flex;
@@ -74,21 +65,12 @@ function getBaseCSS(primary: string, accent: string): string {
       font-weight: 700;
       color: ${primary};
       font-size: 18px;
-      margin-bottom: 8px;
-      overflow: hidden;
-    }
-    .logo-image img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
+      margin-bottom: 4px;
     }
     .logo-number {
-      font-size: 11px;
-      font-weight: 700;
+      font-size: 10px;
+      font-weight: 600;
       color: white;
-      background: rgba(0,0,0,0.2);
-      padding: 4px 8px;
-      border-radius: 3px;
     }
     .header-right {
       flex: 1;
@@ -271,9 +253,7 @@ export async function generateMeetingPdf(data: {
 <div class="page">
   <div class="header">
     <div class="header-logo">
-      <div class="logo-image">
-        <img src="${getLogoBase64(data.company)}" alt="logo" />
-      </div>
+      <div class="logo-image">ق</div>
       <div class="logo-number">${data.meetingNumber || "1447/0000"}</div>
     </div>
     <div class="header-right">
@@ -402,9 +382,7 @@ export async function generateEvaluationPdf(data: {
 <div class="page">
   <div class="header">
     <div class="header-logo">
-      <div class="logo-image">
-        <img src="${getLogoBase64(data.company)}" alt="logo" />
-      </div>
+      <div class="logo-image">ق</div>
       <div class="logo-number">${data.reportNumber || "1447/0001"}</div>
     </div>
     <div class="header-right">
