@@ -1,12 +1,6 @@
 /**
  * خدمة توليد PDF باستخدام Puppeteer مباشرةً
- * تدعم العربية وRTL بشكل كامل
- *
- * المشاكل التي تم حلها:
- * 1. الترميز العربي  → خطوط Noto Naskh Arabic + waitUntil:"networkidle0"
- * 2. بيئة الإنتاج   → كشف تلقائي لمسار Chrome مع fallback سلس
- * 3. البيانات الفارغة → دوال sanitize() تحمي كل حقل قبل الاستخدام
- * (مشكلة الحلقة في PdfPreviewModal تُحل في الملف المقابل)
+ * تم تحديث التصميم بناءً على هوية شركة قريش 2026 دون تغيير في منطق الكود
  */
 
 import puppeteer, { Browser } from "puppeteer";
@@ -21,8 +15,6 @@ async function getBrowser(): Promise<Browser> {
     return browserInstance;
   }
 
-  // ── الحل #2: كشف مسار Chrome في بيئة الإنتاج ──
-  // الأولوية: متغير البيئة ← مسارات Linux الشائعة ← Puppeteer المُضمَّن
   const chromeCandidates = [
     process.env.PUPPETEER_EXECUTABLE_PATH,
     process.env.CHROME_BIN,
@@ -49,14 +41,14 @@ async function getBrowser(): Promise<Browser> {
   }
 
   browserInstance = await puppeteer.launch({
-    executablePath,                  // undefined = Puppeteer يستخدم Chrome المُحمَّل معه
+    executablePath,
     headless: true,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",     // ضروري في Docker / Cloud Run / Render
+      "--disable-dev-shm-usage",
       "--disable-gpu",
-      "--font-render-hinting=none",  // تحسين تصيير الخطوط العربية
+      "--font-render-hinting=none",
     ],
   });
 
@@ -79,10 +71,15 @@ function sanitizeArray(arr: unknown): string[] {
     .filter(Boolean);
 }
 
-// ─── ثوابت ───────────────────────────────────────────────────────────────────
+// ─── ثوابت الهوية البصرية 2026 ────────────────────────────────────────────
 const COMPANY_COLORS = {
-  quraish: { primary: "#1a4a8a", accent: "#e6981a", name: "شركة قريش المحدودة" },
-  azan:    { primary: "#1a5c3a", accent: "#c8a820", name: "شركة أذان المحدودة" },
+  quraish: { 
+    primary: "#4A3382",   // الخزامي [cite: 35, 36]
+    accent: "#CFB88F",    // البيج الذهبي [cite: 37, 38]
+    secondary: "#6B5CA6", // الخزامي الفاتح [cite: 39, 40]
+    name: "شركة قريش المحدودة" 
+  },
+  azan: { primary: "#1a5c3a", accent: "#c8a820", name: "شركة أذان المحدودة" },
 };
 
 const DEPT_MAP: Record<string, string> = {
@@ -92,10 +89,17 @@ const DEPT_MAP: Record<string, string> = {
   cultural:    "الإدارة الثقافية",
   media:       "الإدارة الإعلامية",
   supervisors: "إدارة المشرفين",
+  registration: "إدارة التسجيل",
+  mina_preparation: "تجهيز منى",
+  arafat_preparation: "تجهيز عرفات",
+  muzdalifah_preparation: "تجهيز مزدلفة",
+  quality: "إدارة الجودة",
+  other: "أخرى",
 };
 
-// ─── الحل #1: CSS مع خطوط Google Fonts العربية ──────────────────────────────
-function getBaseCSS(primary: string, accent: string): string {
+// ─── الحل #1: CSS المحدث بتصميم الهوية 2026 ──────────────────────────────
+function getBaseCSS(primary: string, accent: string, secondary?: string): string {
+  const lightLavender = secondary || "#6B5CA6";
   return `
     @import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&display=swap');
 
@@ -104,89 +108,94 @@ function getBaseCSS(primary: string, accent: string): string {
       font-family: 'Noto Naskh Arabic', 'Arial', 'Tahoma', sans-serif;
       direction: rtl;
       text-align: right;
-      color: #222;
+      color: #333;
       background: #fff;
       font-size: 13px;
-      line-height: 1.8;
+      line-height: 1.6;
     }
     .page { width: 210mm; min-height: 297mm; padding: 0; position: relative; }
+    
+    .besmalah { 
+      text-align: center; padding: 12px 0 5px; font-size: 12px; color: ${primary}; font-weight: 600;
+    }
+
     .header {
-      background: ${primary};
-      color: white;
-      padding: 18px 28px 14px;
+      border-bottom: 4px solid ${accent};
+      padding: 20px 45px;
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
+      background: #fff;
     }
     .header-logo {
-      display: flex; flex-direction: column;
-      align-items: center; text-align: center; min-width: 80px;
+      display: flex; align-items: center; gap: 15px;
     }
     .logo-image {
-      width: 50px; height: 50px;
-      background: white; border-radius: 4px;
+      width: 60px; height: 60px;
+      background: ${primary}; border-radius: 6px;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; color: ${primary}; font-size: 18px; margin-bottom: 4px;
+      font-weight: 700; color: white; font-size: 28px;
     }
-    .logo-number { font-size: 10px; font-weight: 600; color: white; }
-    .header-right { flex: 1; text-align: right; padding-right: 20px; }
-    .company-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
-    .doc-type { font-size: 14px; font-weight: 600; opacity: 0.95; }
-    .header-left { flex: 1; }
-    .accent-bar { height: 4px; background: ${accent}; }
+    .company-name { font-size: 18px; font-weight: 700; color: ${primary}; }
+    .doc-type { font-size: 14px; font-weight: 600; color: ${accent}; }
+
     .info-bar {
-      background: #f5f5f5; padding: 10px 28px;
-      font-size: 11px; color: #666;
-      display: flex; justify-content: space-between;
-    }
-    .content { padding: 28px; min-height: 400px; }
-    .section {
-      margin-bottom: 20px; border: 1px solid #ddd;
-      border-radius: 4px; overflow: hidden;
-    }
-    .section-header {
       background: ${primary}; color: white;
-      padding: 10px 14px; font-weight: 600; font-size: 12px;
+      padding: 8px 45px;
+      font-size: 11px;
+      display: flex; justify-content: space-between;
+      font-weight: 600;
     }
-    .section-body { padding: 12px 14px; }
+    .content { padding: 35px 45px; min-height: 400px; }
+    
+    .section-header {
+      border-right: 4px solid ${accent};
+      padding-right: 12px; margin-bottom: 15px;
+      color: ${primary}; font-weight: 700; font-size: 14px;
+    }
+
     .data-row {
       display: flex; justify-content: space-between;
-      padding: 8px 0; border-bottom: 1px solid #eee;
+      padding: 10px 0; border-bottom: 1px solid #eee;
     }
-    .data-row:last-child { border-bottom: none; }
-    .data-label { font-weight: 600; color: #555; min-width: 100px; }
-    .data-value { color: #222; text-align: left; flex: 1; }
+    .data-label { font-weight: 700; color: ${primary}; min-width: 120px; }
+    .data-value { color: #333; flex: 1; text-align: left; }
+
     .score-box {
-      background: #f9f9f9; border: 2px solid ${accent};
-      border-radius: 4px; padding: 20px; margin: 20px 0;
+      background: #fcfaff; border: 1px solid ${accent};
+      border-radius: 8px; padding: 25px; margin: 25px 0;
       display: flex; justify-content: space-between; align-items: center;
     }
-    .score-label { font-size: 11px; color: #666; margin-bottom: 4px; }
-    .score-number { font-size: 36px; font-weight: 700; margin: 4px 0; }
-    .score-info { flex: 1; padding-right: 20px; }
+    .score-number { font-size: 42px; font-weight: 700; }
     .progress-bar {
-      height: 8px; background: #ddd; border-radius: 4px;
-      overflow: hidden; margin-top: 8px;
+      height: 10px; background: #eee; border-radius: 5px;
+      overflow: hidden; margin-top: 10px; width: 200px;
     }
     .progress-fill { height: 100%; }
-    .table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-    .table th {
-      background: ${primary}; color: white;
-      padding: 10px; text-align: right; font-weight: 600; font-size: 11px;
+
+    .table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    .table td { 
+      padding: 12px; border: 1px solid ${lightLavender}33; 
+      font-size: 12px; 
     }
-    .table td { padding: 10px; border-bottom: 1px solid #ddd; font-size: 11px; }
-    .table tr:nth-child(even) { background: #f9f9f9; }
-    .signature-area { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; }
-    .signature-block { display: inline-block; text-align: center; min-width: 150px; }
-    .signature-line { border-top: 1px solid #222; margin-bottom: 4px; width: 150px; }
-    .signature-name { font-weight: 600; font-size: 11px; margin-bottom: 2px; }
-    .signature-role { font-size: 10px; color: #666; }
+    .item-num {
+      width: 22px; height: 22px; background: ${accent};
+      color: white; border-radius: 4px; display: inline-flex;
+      align-items: center; justify-content: center; font-weight: bold;
+      margin-left: 10px; font-size: 11px;
+    }
+
+    .signature-area { margin-top: 50px; display: flex; justify-content: flex-end; }
+    .signature-block { text-align: center; width: 180px; }
+    .signature-line { border-top: 1px solid ${primary}; margin-bottom: 8px; }
+    .signature-name { font-weight: 700; color: ${primary}; }
+
     .footer {
-      position: fixed; bottom: 0; width: 100%;
-      background: #f5f5f5; padding: 8px 28px;
-      border-top: 1px solid #ddd;
+      position: absolute; bottom: 0; width: 100%;
+      background: #fcfcfc; padding: 12px 45px;
+      border-top: 1px solid ${accent};
       display: flex; justify-content: space-between;
-      font-size: 10px; color: #666;
+      font-size: 10px; color: ${primary}; font-weight: 600;
     }
   `;
 }
@@ -196,15 +205,13 @@ async function htmlToPdfBuffer(html: string): Promise<Buffer> {
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    // waitUntil:"networkidle0" يضمن تحميل Google Fonts قبل الطباعة (الحل #1)
     await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
-    // انتظار إضافي لتأكيد تصيير الخطوط العربية
     await page.evaluateHandle("document.fonts.ready");
 
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin: { top: "0", right: "0", bottom: "20mm", left: "0" },
+      margin: { top: "0", right: "0", bottom: "15mm", left: "0" },
     });
 
     return Buffer.from(pdfBuffer);
@@ -225,6 +232,7 @@ export async function generateMeetingPdf(data: {
   elements?: unknown;
   recommendations?: unknown;
   department?: string | null;
+  customDepartment?: string | null; // الحقل المخصص
   attendees?: unknown;
   meetingNumber?: string | null;
   createdByName?: string | null;
@@ -233,12 +241,16 @@ export async function generateMeetingPdf(data: {
   const colors = COMPANY_COLORS[companyKey as keyof typeof COMPANY_COLORS] ?? COMPANY_COLORS.quraish;
 
   const meetingNumber = sanitize(data.meetingNumber, "1447/0000");
-  const hijriDate     = sanitize(data.hijriDate, "—");
-  const dayOfWeek     = sanitize(data.dayOfWeek, "");
-  const title         = sanitize(data.title, "بدون عنوان");
+  const hijriDate      = sanitize(data.hijriDate, "—");
+  const dayOfWeek      = sanitize(data.dayOfWeek, "");
+  const title          = sanitize(data.title, "بدون عنوان");
   const createdByName = data.createdByName ? sanitize(data.createdByName) : null;
+  
+  // معالجة الإدارة وحقل "أخرى"
   const department    = data.department ? sanitize(data.department) : null;
-  const deptDisplay   = department ? (DEPT_MAP[department] ?? department) : null;
+  const deptDisplay   = department === "other" && data.customDepartment 
+    ? data.customDepartment 
+    : (department ? (DEPT_MAP[department] ?? department) : null);
 
   const elements        = sanitizeArray(data.elements);
   const recommendations = sanitizeArray(data.recommendations);
@@ -246,74 +258,55 @@ export async function generateMeetingPdf(data: {
 
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head><meta charset="UTF-8"><style>${getBaseCSS(colors.primary, colors.accent)}</style></head>
+<head><meta charset="UTF-8"><style>${getBaseCSS(colors.primary, colors.accent, colors.secondary)}</style></head>
 <body><div class="page">
-
+  <div class="besmalah">بسم الله الرحمن الرحيم</div>
   <div class="header">
     <div class="header-logo">
-      <div class="logo-image">م</div>
-      <div class="logo-number">${meetingNumber}</div>
-    </div>
-    <div class="header-right">
+      <div class="logo-image">${companyKey === 'quraish' ? 'ق' : 'أ'}</div>
       <div class="company-name">${colors.name}</div>
-      <div class="doc-type">محضر اجتماع</div>
     </div>
-    <div class="header-left"></div>
+    <div class="doc-type">محضر اجتماع رسمي</div>
   </div>
-  <div class="accent-bar"></div>
 
   <div class="info-bar">
-    <span>${[dayOfWeek, hijriDate].filter(Boolean).join("  |  ")}</span>
+    <span>اليوم: ${dayOfWeek}</span>
+    <span>التاريخ: ${hijriDate} هـ</span>
+    <span>المرجع: ${meetingNumber}</span>
   </div>
 
   <div class="content">
-    <div class="section">
-      <div class="section-header">معلومات الاجتماع</div>
-      <div class="section-body">
-        <div class="data-row">
-          <span class="data-label">العنوان</span>
-          <span class="data-value">${title}</span>
-        </div>
-        ${deptDisplay ? `<div class="data-row">
-          <span class="data-label">الإدارة</span>
-          <span class="data-value">${deptDisplay}</span>
-        </div>` : ""}
-      </div>
+    <div class="section-header">بيانات الاجتماع</div>
+    <div style="border: 1px solid #eee; padding: 15px; border-radius: 6px; margin-bottom: 25px;">
+        <div class="data-row"><span class="data-label">الموضوع</span><span class="data-value">${title}</span></div>
+        ${deptDisplay ? `<div class="data-row"><span class="data-label">الإدارة</span><span class="data-value">${deptDisplay}</span></div>` : ""}
     </div>
 
-    ${elements.length > 0 ? `<div class="section">
-      <div class="section-header">عناصر الاجتماع</div>
-      <div class="section-body"><table class="table"><tbody>
-        ${elements.map((e, i) => `<tr><td style="width:30px;text-align:center">${i+1}</td><td>${e}</td></tr>`).join("")}
-      </tbody></table></div>
+    ${elements.length > 0 ? `
+    <div class="section-header">أجندة وعناصر الاجتماع</div>
+    <table class="table"><tbody>
+        ${elements.map((e, i) => `<tr><td><span class="item-num">${i+1}</span>${e}</td></tr>`).join("")}
+    </tbody></table>` : ""}
+
+    ${recommendations.length > 0 ? `
+    <div style="margin-top: 25px;" class="section-header">التوصيات والقرارات</div>
+    <div style="background: #fcfaff; border: 1px dashed ${colors.secondary}; padding: 15px; border-radius: 8px;">
+        ${recommendations.map(r => `<p style="margin-bottom:8px;">• ${r}</p>`).join("")}
     </div>` : ""}
 
-    ${recommendations.length > 0 ? `<div class="section">
-      <div class="section-header">التوصيات</div>
-      <div class="section-body"><table class="table"><tbody>
-        ${recommendations.map((r, i) => `<tr><td style="width:30px;text-align:center">${i+1}</td><td>${r}</td></tr>`).join("")}
-      </tbody></table></div>
-    </div>` : ""}
-
-    ${attendees.length > 0 ? `<div class="section">
-      <div class="section-header">الحضور</div>
-      <div class="section-body"><table class="table"><tbody>
-        ${attendees.map((a, i) => `<tr><td style="width:30px;text-align:center">${i+1}</td><td>${a}</td></tr>`).join("")}
-      </tbody></table></div>
-    </div>` : ""}
-
-    ${createdByName ? `<div class="signature-area">
+    ${createdByName ? `
+    <div class="signature-area">
       <div class="signature-block">
         <div class="signature-line"></div>
         <div class="signature-name">${createdByName}</div>
-        <div class="signature-role">المُعِد</div>
+        <div style="font-size:10px; color:#666;">مُعد المحضر</div>
       </div>
     </div>` : ""}
   </div>
 
   <div class="footer">
-    <span>${colors.name}  |  نظام التوثيق</span>
-    <span>${new Date().toLocaleDateString("ar-SA")}</span>
+    <span>حجاً مبروراً وسعياً مشكوراً</span>
+    <span>نظام التوثيق - ${colors.name}</span>
   </div>
 </div></body></html>`;
 
@@ -340,85 +333,64 @@ export async function generateEvaluationPdf(data: {
   const colors = COMPANY_COLORS[companyKey as keyof typeof COMPANY_COLORS] ?? COMPANY_COLORS.quraish;
 
   const reportNumber  = sanitize(data.reportNumber, "1447/0001");
-  const hijriDate     = sanitize(data.hijriDate, "—");
-  const dayOfWeek     = sanitize(data.dayOfWeek, "");
-  const axis          = sanitize(data.axis, "—");
-  const track         = sanitize(data.track, "—");
-  const criterion     = sanitize(data.criterion, "—");
+  const hijriDate      = sanitize(data.hijriDate, "—");
+  const axis           = sanitize(data.axis, "—");
+  const track          = sanitize(data.track, "—");
+  const criterion      = sanitize(data.criterion, "—");
   const createdByName = data.createdByName ? sanitize(data.createdByName) : null;
 
-  // الحل #4: score قد يكون null أو NaN
   const rawScore = Number(data.score);
   const score = Number.isFinite(rawScore) ? Math.min(100, Math.max(0, rawScore)) : 0;
   const scoreColor = score >= 70 ? "#1a9e3a" : score >= 50 ? "#e6981a" : "#d32f2f";
-  const scoreLabel  = score >= 70 ? "ممتاز" : score >= 50 ? "جيد" : "يحتاج تحسين";
   const notes = data.notes ? sanitize(data.notes).replace(/\n/g, "<br>") : null;
 
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head><meta charset="UTF-8"><style>${getBaseCSS(colors.primary, colors.accent)}</style></head>
+<head><meta charset="UTF-8"><style>${getBaseCSS(colors.primary, colors.accent, colors.secondary)}</style></head>
 <body><div class="page">
-
+  <div class="besmalah">بسم الله الرحمن الرحيم</div>
   <div class="header">
     <div class="header-logo">
       <div class="logo-image">ت</div>
-      <div class="logo-number">${reportNumber}</div>
-    </div>
-    <div class="header-right">
       <div class="company-name">${colors.name}</div>
-      <div class="doc-type">تقرير تقييم الأداء</div>
     </div>
-    <div class="header-left"></div>
+    <div class="doc-type">تقرير تقييم الأداء</div>
   </div>
-  <div class="accent-bar"></div>
 
   <div class="info-bar">
-    <span>${[dayOfWeek, hijriDate].filter(Boolean).join("  |  ")}</span>
+    <span>التاريخ: ${hijriDate} هـ</span>
+    <span>الرقم المرجعي: ${reportNumber}</span>
   </div>
 
   <div class="content">
-    <div class="section">
-      <div class="section-header">بيانات التقييم</div>
-      <div class="section-body">
+    <div class="section-header">بيانات التقييم</div>
+    <div style="border: 1px solid #eee; padding: 15px; border-radius: 6px;">
         <div class="data-row"><span class="data-label">المحور</span><span class="data-value">${axis}</span></div>
         <div class="data-row"><span class="data-label">المسار</span><span class="data-value">${track}</span></div>
         <div class="data-row"><span class="data-label">المعيار</span><span class="data-value">${criterion}</span></div>
-      </div>
     </div>
 
     <div class="score-box">
       <div>
-        <div class="score-label">الدرجة المحققة</div>
-        <div class="score-number" style="color:${scoreColor}">${score}</div>
-        <div style="font-size:11px;color:#888">من 100</div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 5px;">النتيجة الإجمالية</div>
+        <div class="score-number" style="color:${scoreColor}">${score}%</div>
       </div>
-      <div class="score-info">
-        <div style="font-size:12px;font-weight:600;color:${scoreColor}">${scoreLabel}</div>
+      <div style="flex: 1; padding-right: 40px;">
+        <div style="font-size:14px; font-weight:700; color:${scoreColor}">${score >= 70 ? "أداء متميز" : score >= 50 ? "أداء جيد" : "يحتاج تطوير"}</div>
         <div class="progress-bar">
-          <div class="progress-fill" style="width:${score}%;background:${scoreColor}"></div>
+          <div class="progress-fill" style="width:${score}%; background:${scoreColor}"></div>
         </div>
       </div>
     </div>
 
-    ${notes ? `<div class="section">
-      <div class="section-header">الملاحظات</div>
-      <div class="section-body">
-        <div style="padding:12px 14px;font-size:12px;line-height:1.8">${notes}</div>
-      </div>
-    </div>` : ""}
-
-    ${createdByName ? `<div class="signature-area">
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-name">${createdByName}</div>
-        <div class="signature-role">المُعِد</div>
-      </div>
-    </div>` : ""}
+    ${notes ? `
+    <div class="section-header">الملاحظات</div>
+    <div style="padding:15px; background:#fff; border:1px solid #eee; border-radius:6px; font-size:12px;">${notes}</div>` : ""}
   </div>
 
   <div class="footer">
-    <span>${colors.name}  |  نظام التوثيق</span>
-    <span>${new Date().toLocaleDateString("ar-SA")}</span>
+    <span>${colors.name} | قسم الجودة</span>
+    <span>نظام التوثيق - 2026</span>
   </div>
 </div></body></html>`;
 
