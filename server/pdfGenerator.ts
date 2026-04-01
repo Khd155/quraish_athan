@@ -45,7 +45,7 @@ function getBaseCSS(primary: string, accent: string, secondary: string): string 
   return `
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Trebuchet MS', 'Tahoma', 'Arial', sans-serif;
+      font-family: 'Tajawal', 'Arial', sans-serif;
       direction: rtl;
       text-align: right;
       color: #333;
@@ -55,9 +55,9 @@ function getBaseCSS(primary: string, accent: string, secondary: string): string 
     }
     .page { width: 210mm; min-height: 297mm; padding: 0; position: relative; }
     
-    /* ===== خطوط العناوين ===== */
+     /* ===== خطوط العناوين ===== */
     h1, h2, h3, .company-name, .section-header {
-      font-family: 'Verdana', 'Tahoma', sans-serif;
+      font-family: 'Tajawal', 'Arial', sans-serif;
       font-weight: bold;
     }
     
