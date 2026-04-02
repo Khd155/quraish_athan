@@ -29,7 +29,8 @@ export const meetings = mysqlTable("meetings", {
   title: text("title").notNull(),
   elements: text("elements"),
   recommendations: text("recommendations"),
-  department: mysqlEnum("department", ["technology", "catering", "transport", "cultural", "media", "supervisors"]),
+  department: mysqlEnum("department", ["technology", "catering", "transport", "cultural", "media", "supervisors", "executive", "registration", "mina_preparation", "arafat_preparation", "muzdalifah_preparation", "quality", "other"]),
+  customDepartment: varchar("customDepartment", { length: 255 }),
   attendees: json("attendees"),
   status: mysqlEnum("status", ["draft", "final"]).default("draft").notNull(),
   createdById: int("createdById").notNull(),
@@ -92,3 +93,4 @@ export const reportCounters = mysqlTable("report_counters", {
 });
 
 export type ReportCounter = typeof reportCounters.$inferSelect;
+export type InsertReportCounter = typeof reportCounters.$inferInsert;
