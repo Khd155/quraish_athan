@@ -18,13 +18,6 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { downloadPdf } from "@/lib/downloadPdf";
 
 const DEPARTMENTS = [
-  { value: "executive", label: "الإدارة العليا" },
-  { value: "registration", label: "إدارة التسجيل" },
-  { value: "mina_preparation", label: "إدارة تجهيز منى" },
-  { value: "arafat_preparation", label: "إدارة تجهيز عرفات" },
-  { value: "muzdalifah_preparation", label: "إدارة تجهيز مزدلفة" },
-  { value: "quality", label: "إدارة الجودة" },
-  { value: "other", label: "إدارة أخرى" },
   { value: "technology", label: "إدارة التقنية" },
   { value: "catering", label: "إدارة الإعاشة" },
   { value: "transport", label: "إدارة النقل" },
@@ -85,7 +78,6 @@ export default function MeetingForm() {
       const recStr = (existingMeeting.recommendations as string) || "";
       setRecommendations(recStr ? recStr.split("\n").filter(r => r.trim()) : [""]);
       setDepartment(existingMeeting.department || "");
-      setCustomDepartment((existingMeeting as any).customDepartment || "");
       setAttendees((existingMeeting.attendees as string[]) || [""]);
       setEntityId(existingMeeting.id);
     }
@@ -104,8 +96,6 @@ export default function MeetingForm() {
     onError: (err) => toast.error(err.message),
   });
 
-  const [customDepartment, setCustomDepartment] = useState("");
-
   const handleSave = (status: "draft" | "final") => {
     if (!title.trim()) {
       toast.error("يرجى إدخال عنوان المحضر");
@@ -119,8 +109,7 @@ export default function MeetingForm() {
       title: title.trim(),
       elements: elements.filter(e => e.trim()).join("\n"),
       recommendations: recommendations.filter(r => r.trim()).join("\n"),
-      department: department as "technology" | "catering" | "transport" | "cultural" | "media" | "supervisors" | "executive" | "registration" | "mina_preparation" | "arafat_preparation" | "muzdalifah_preparation" | "quality" | "other" | undefined || undefined,
-      customDepartment: department === "other" ? customDepartment : undefined,
+      department: department as "technology" | "catering" | "transport" | "cultural" | "media" | "supervisors" | undefined || undefined,
       attendees: attendees.filter(a => a.trim()),
       status,
     };
@@ -290,19 +279,6 @@ export default function MeetingForm() {
               </SelectContent>
             </Select>
           </div>
-
-          {/* Custom Department */}
-          {department === "other" && (
-            <div className="space-y-2">
-              <Label>اسم الإدارة المخصصة</Label>
-              <Input
-                type="text"
-                value={customDepartment}
-                onChange={(e) => setCustomDepartment(e.target.value)}
-                placeholder="أدخل اسم الإدارة"
-              />
-            </div>
-          )}
 
           {/* Elements */}
           <div className="space-y-2">
